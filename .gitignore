@@ -1,0 +1,6 @@
+.idea/
+ignite/
+target/
+*.iml
+*.jar
+debug/

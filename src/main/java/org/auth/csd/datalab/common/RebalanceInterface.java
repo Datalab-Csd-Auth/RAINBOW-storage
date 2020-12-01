@@ -1,0 +1,12 @@
+package org.auth.csd.datalab.common;
+
+import org.apache.ignite.services.Service;
+
+import java.util.Set;
+
+public interface RebalanceInterface extends Service {
+    /** Service name */
+    public static final String SERVICE_NAME = "RebalanceService";
+
+    public String rebalanceData(Set<String> keys);
+}
