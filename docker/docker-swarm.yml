@@ -5,7 +5,7 @@ networks:
 
 services:
   ignite-server:
-    image: ignite-server:1.0.0
+    image: ignite-server:1.0.1
     hostname: server-{{ .Task.Slot }}
     networks:
       - ignite-net
@@ -37,7 +37,7 @@ services:
         window: 120s
         
   ignite-client:
-    image: ignite-client:1.0.0
+    image: ignite-client:1.0.1
     hostname: client-{{ .Task.Slot }}
     networks:
       - ignite-net

@@ -1,10 +1,10 @@
 # RAINBOW-Distributed data storage
 
-Rainbow's distributed data storage is developed using the [**Apache Kafka**](https://ignite.apache.org/) main-memory database.
+Rainbow's distributed data storage is developed using the [**Apache Ignite**](https://ignite.apache.org/) main-memory database.
 
 The storage component comprises of 2 different instances, the ignite-server and the ignite-client ones.
 
-##Ignite-server
+## Ignite-server
 
 Ignite-server is responsible for storing local data and/or remote data depending on other nodes' resource congestion. 
 
