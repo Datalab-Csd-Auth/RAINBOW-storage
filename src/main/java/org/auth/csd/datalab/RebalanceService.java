@@ -64,8 +64,10 @@ public class RebalanceService implements RebalanceInterface {
     }
 
     @Override
-    public String rebalanceData(Set<String> keys) {
-        //Start by checking if cache is replicated
+    public Void rebalanceData(Set<String> keys) {
+        //Start by checking if state is partitioned/replicated and remote node still exists
+        if((state == 1 || state == 2) && ignite.cluster().forServers().forNodeId(externalNode).nodes().size() == 0) state = 0;
+        //Start by checking if cache is replicated/partitioned
         if(state == 1){
             replicateData();
         }else if(state == 2){
@@ -78,18 +80,28 @@ public class RebalanceService implements RebalanceInterface {
             //TODO better conditions AND way to find new nodes
             if(cpuload >= 0.5){ //Too much load, replicate data for safety
                 System.out.println("Replication needed");;
-                externalNode = ignite.cluster().forServers().forRemotes().forRandom().node().id();
-                replicateData();
-                metaCache.put(localNode + delimiter + "replicated", externalNode.toString());
-                state = 1;
-                metaCache.remove(localNode + delimiter + "local");
+                if(ignite.cluster().forServers().forRemotes().nodes().size() > 0) {
+                    externalNode = ignite.cluster().forServers().forRemotes().forRandom().node().id();
+                    replicateData();
+                    metaCache.put(localNode + delimiter + "replicated", externalNode.toString());
+                    state = 1;
+                    metaCache.remove(localNode + delimiter + "local");
+                    System.out.println("Replication successful on node " + externalNode);
+                }else{
+                    System.out.println("Could not find a node for replication! Data stay local only!");
+                }
             }else if (cpuload >= 0.25){ //Mild load, partition data
                 System.out.println("Partitioning needed");
-                externalNode = ignite.cluster().forServers().forRemotes().forRandom().node().id();
-                partitionData();
-                metaCache.put(localNode + delimiter + "partitioned", externalNode.toString() + delimiter + localFilter.replaceFirst("local" + delimiter,""));
-                state = 2;
-                metaCache.remove(localNode + delimiter + "local");
+                if(ignite.cluster().forServers().forRemotes().nodes().size() > 0) {
+                    externalNode = ignite.cluster().forServers().forRemotes().forRandom().node().id();
+                    partitionData();
+                    metaCache.put(localNode + delimiter + "partitioned", externalNode.toString() + delimiter + localFilter.replaceFirst("local" + delimiter, ""));
+                    state = 2;
+                    metaCache.remove(localNode + delimiter + "local");
+                    System.out.println("Partitioning successful on node " + externalNode);
+                }else{
+                    System.out.println("Could not find a node for partitioning! Data stay local only!");
+                }
             }
         }
         return null;

@@ -90,27 +90,35 @@ public class IngestionService implements IngestionInterface {
             try {
                 externalConnect = new ServerSocket(50000);
                 while (!isInterrupted()) {
-                    //Get node id
-                    UUID uuid = ignite.cluster().localNode().id();
+                    //Input data structure
+                    HashMap<String,Object> data = null;
                     //Read from the socket
                     Socket socket = externalConnect.accept();
                     DataInputStream dis = new DataInputStream(socket.getInputStream());
                     //Get ingestion data
-                    String jsonString = dis.readUTF();
-                    //Parse json and save data
-                    HashMap<String,Object> data = jsonToMap(jsonString);
-                    ingestData(data);
+                    try{
+                        String jsonString = dis.readUTF();
+                        //Parse json and save data
+                        data = jsonToMap(jsonString);
+                        ingestData(data);
+                    }catch (Exception e){
+                        System.out.println("Could not read input data! Ingestion failed!");
+                    }
                     //Close input stream
                     dis.close();
                     socket.close();
-                    // Rebalance data on local node
-                    RebalanceService rebalanceService = ignite.services(ignite.cluster().forLocal()).serviceProxy(RebalanceInterface.SERVICE_NAME,
-                            RebalanceInterface.class, false);
-                    rebalanceService.rebalanceData(data.keySet());
+                    //Check if there are input data
+                    if(data != null && !data.isEmpty()) {
+                        // Rebalance data on local node
+                        RebalanceService rebalanceService = ignite.services(ignite.cluster().forLocal()).serviceProxy(RebalanceInterface.SERVICE_NAME,
+                                RebalanceInterface.class, false);
+                        rebalanceService.rebalanceData(data.keySet());
+                    }
                 }
             }
             catch (IOException e) {
                 e.printStackTrace();
+                System.out.println("Could not create socket connection on port 50000!");
             }
         }
 

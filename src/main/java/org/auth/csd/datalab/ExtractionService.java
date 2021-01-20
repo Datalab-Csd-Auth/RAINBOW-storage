@@ -105,25 +105,33 @@ public class ExtractionService implements ExtractionInterface {
             try {
                 externalConnect = new ServerSocket(50001);
                 while (!isInterrupted()) {
+                    //Data structure
+                    HashMap<String, Object> data = null;
                     Socket socket = externalConnect.accept();
                     DataInputStream dis = new DataInputStream(socket.getInputStream());
-                    //Get json keys
-                    String jsonString = dis.readUTF();
-                    Set<String> keys = jsonKeysToSet(jsonString);
-                    //Create filter
-                    IgniteBiPredicate<String, Object> filter = (key, val) -> containsKey(key, keys);
-                    //Get data
-                    HashMap<String, Object> data = extractData(filter, false);
-                    //Transform to json
-                    JSONObject json = new JSONObject();
-                    json.put("monitoring", data);
-                    //Return data
-                    ObjectOutputStream dos = new ObjectOutputStream(socket.getOutputStream());
-                    // Writing the result into the socket.
-                    dos.writeObject(data);
+                    try{
+                        //Get json keys
+                        String jsonString = dis.readUTF();
+                        Set<String> keys = jsonKeysToSet(jsonString);
+                        //Create filter
+                        IgniteBiPredicate<String, Object> filter = (key, val) -> containsKey(key, keys);
+                        //Get data
+                        data = extractData(filter, false);
+                    }catch (Exception e){
+                        System.out.println("Could not read input data! Extraction failed!");
+                    }
+                    if(data != null && !data.isEmpty()) {
+                        //Transform to json
+                        JSONObject json = new JSONObject();
+                        json.put("monitoring", data);
+                        //Return data
+                        ObjectOutputStream dos = new ObjectOutputStream(socket.getOutputStream());
+                        // Writing the result into the socket.
+                        dos.writeObject(data);
+                        dos.close();
+                    }
                     //Close streams
                     dis.close();
-                    dos.close();
                     socket.close();
                 }
             }
