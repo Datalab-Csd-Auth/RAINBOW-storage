@@ -84,7 +84,6 @@ public class ClientExtractionService implements ClientExtractionInterface {
 
     private HashMap<String, HashSet<String>> getNodeQueries(HashSet<String> nodes, Set<String> data){
         //Get the meta data
-        //IgniteBiPredicate<String, String> filter = (key, val) -> containsMetaKey(key, nodes);
         HashMap<String, Object> metadata = extractMeta(nodes);
         //Find the nodes and data to query for each node
         HashMap<String, HashSet<String>> keysWNodes = new HashMap<>();
@@ -177,7 +176,6 @@ public class ClientExtractionService implements ClientExtractionInterface {
         return data;
     }
 
-    //TODO
     @Override
     public HashMap<String, Object> extractData(HashMap<String, HashSet<String>> data) {
         //Ready map for data
@@ -220,8 +218,6 @@ public class ClientExtractionService implements ClientExtractionInterface {
                     JSONObject obj = new JSONObject(jsonString);
                     if(obj.has("metadata")) {
                         HashSet<String> keys = jsonToSet(obj, "metadata");
-                        //Create filter
-                        //IgniteBiPredicate<String, String> filter = (key, val) -> containsMetaKey(key, keys)};
                         //Get data
                         HashMap<String, Object> data = extractMeta(keys);
                         //Create the returned json
