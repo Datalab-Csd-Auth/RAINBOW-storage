@@ -2,9 +2,9 @@ package org.auth.csd.datalab.common.helpers;
 
 public class Metric {
 
-    public int entityID;
+    public String entityID;
     public String entityType;
-    public int metricID;
+    public String metricID;
     public String name;
     public String units;
     public String desc;
@@ -18,9 +18,9 @@ public class Metric {
     @Override
     public String toString() {
         return "{" +
-                "\"entityID\": " + entityID +
+                "\"entityID\": \"" + entityID + "\"" +
                 ", \"entityType\": \"" + entityType + "\"" +
-                ", \"metricID\": " + metricID +
+                ", \"metricID\": \"" + metricID + "\"" +
                 ", \"name\": \"" + name + "\"" +
                 ", \"units\": \"" + units + "\"" +
                 ", \"desc\": \"" + desc + "\"" +
