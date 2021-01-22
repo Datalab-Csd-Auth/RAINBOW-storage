@@ -1,4 +1,4 @@
-package org.auth.csd.datalab.common;
+package org.auth.csd.datalab.common.interfaces;
 
 import org.apache.ignite.services.Service;
 

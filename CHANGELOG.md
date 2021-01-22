@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0] - 22-01-2021
+
+### Added 
+
+- Class for metrics with metadata
+
+### Changed
+
+- Ingestion and Extraction services of `Ignite-server` are incorporated into a single REST API instead of a simple socket connection.
+- Ingestion service does not call rebalancing service on each ingest task.
+- Stopped `Ignite-client`'s extraction service in order to incorporate it in a REST API.  
+
 ## [1.0.1] - 20-01-2021
 
 ### Added
@@ -21,5 +33,6 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance)
 - 1 service for `Ignite-client` (Extraction)
 
+[1.1.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.1.0
 [1.0.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.0.1
 [1.0.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.0.0

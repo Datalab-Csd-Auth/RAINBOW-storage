@@ -6,8 +6,8 @@ import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.lang.IgniteBiPredicate;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
-import org.auth.csd.datalab.common.ClientExtractionInterface;
-import org.auth.csd.datalab.common.ExtractionInterface;
+import org.auth.csd.datalab.common.interfaces.ClientExtractionInterface;
+import org.auth.csd.datalab.common.interfaces.DataInterface;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -188,10 +188,10 @@ public class ClientExtractionService implements ClientExtractionInterface {
                 else tmpData.add(entry);
             }
             IgniteBiPredicate<String, Object> filter = (key, val) -> tmpData.contains(key);
-            ExtractionInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(UUID.fromString(node))).serviceProxy(ExtractionInterface.SERVICE_NAME,
-                    ExtractionInterface.class, false);
-            HashMap<String, Object> nodeData = extractionInterface.extractData(filter, false);
-            result.put(node, nodeData);
+            DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(UUID.fromString(node))).serviceProxy(DataInterface.SERVICE_NAME,
+                    DataInterface.class, false);
+            //HashMap<String, Object> nodeData = extractionInterface.extractData(filter, false);
+            //result.put(node, nodeData);
         }
         return result;
     }
