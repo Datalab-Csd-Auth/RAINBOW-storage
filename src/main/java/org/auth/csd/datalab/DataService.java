@@ -112,7 +112,7 @@ public class DataService implements DataInterface {
                         ObjectMapper m = new ObjectMapper();
                         try {
                             Metric myMetric = m.readValue(o.toString(), Metric.class);
-                            String key = myMetric.entityID+"."+myMetric.metricID+"."+ myMetric.timestamp;
+                            String key = myMetric.entityID+delimiter+myMetric.metricID+delimiter+ myMetric.timestamp;
                             metrics.put(key, myMetric);
                         } catch (IOException e) {
                             e.printStackTrace();
