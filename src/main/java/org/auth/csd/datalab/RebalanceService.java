@@ -6,9 +6,7 @@ import org.apache.ignite.cluster.ClusterMetrics;
 import org.apache.ignite.lang.IgniteBiPredicate;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
-import org.auth.csd.datalab.common.ExtractionInterface;
-import org.auth.csd.datalab.common.IngestionInterface;
-import org.auth.csd.datalab.common.RebalanceInterface;
+import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
 
 import java.util.*;
 
@@ -108,6 +106,7 @@ public class RebalanceService implements RebalanceInterface {
     }
 
     private void partitionData(){
+        /*
         System.out.println("Partitioning data from " + localNode + " to " + externalNode);
         //TODO Create the filter
         if(localFilter == null) localFilter = "local" + delimiter + "application";
@@ -126,9 +125,12 @@ public class RebalanceService implements RebalanceInterface {
         IngestionInterface ingestionInterface = ignite.services(ignite.cluster().forNodeId(externalNode)).serviceProxy(IngestionInterface.SERVICE_NAME,
                 IngestionInterface.class, false);
         ingestionInterface.ingestData(data);
+
+         */
     }
 
     private void replicateData(){
+        /*
         System.out.println("Replicating data from " + localNode + " to " + externalNode);
         //Get all local data
         ExtractionService extractionService = ignite.services(ignite.cluster().forLocal()).serviceProxy(ExtractionInterface.SERVICE_NAME,
@@ -147,6 +149,8 @@ public class RebalanceService implements RebalanceInterface {
         IngestionInterface ingestionInterface = ignite.services(ignite.cluster().forNodeId(externalNode)).serviceProxy(IngestionInterface.SERVICE_NAME,
                 IngestionInterface.class, false);
         ingestionInterface.ingestData(data);
+
+         */
     }
 
 }

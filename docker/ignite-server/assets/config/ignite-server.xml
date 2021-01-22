@@ -56,21 +56,9 @@
             <list>
                 <bean class="org.apache.ignite.services.ServiceConfiguration">
                     <!-- Unique service name -->
-                    <property name="name" value="IngestionService"/>
+                    <property name="name" value="DataService"/>
                     <property name="service">
-                        <bean class="org.auth.csd.datalab.IngestionService"/>
-                    </property>
-                    <!-- Only one instance of the service can be deployed on a single node. -->
-                    <property name="maxPerNodeCount" value="1"/>
-		    <property name="nodeFilter">
-                        <bean class="org.auth.csd.datalab.common.filter.DataFilter"/>
-                    </property>
-                </bean>
-                <bean class="org.apache.ignite.services.ServiceConfiguration">
-                    <!-- Unique service name -->
-                    <property name="name" value="ExtractionService"/>
-                    <property name="service">
-                        <bean class="org.auth.csd.datalab.ExtractionService"/>
+                        <bean class="org.auth.csd.datalab.DataService"/>
                     </property>
                     <!-- Only one instance of the service can be deployed on a single node. -->
                     <property name="maxPerNodeCount" value="1"/>

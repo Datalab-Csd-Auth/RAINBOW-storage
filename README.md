@@ -10,9 +10,9 @@ Ignite-server is responsible for storing local data and/or remote data depending
 
 It incorporates 3 different services:
 
-- Ingestion service: which is responsible for ingesting data via a socket connection.
-- Extraction service: which is responsible for extracting locally stored data via a socket connection.
-- Rebalance service: which is responsible for rebalancing the ingested data based on the node's resource congestion. This service is called internally after every ingestion task is completed to check if data replication/partitioning is needed. 
+- Ingestion service: which is responsible for ingesting data via REST API with `put` route. The API expects a POST request with a json containing the metrics.
+- Extraction service: which is responsible for extracting locally stored data via REST API with `get` route. The API expects a POST request either empty or with a json containing the filter.
+- (*IN PROGRESS*) Rebalance service: which is responsible for rebalancing the ingested data based on the node's resource congestion. This service is called internally after every ingestion task is completed to check if data replication/partitioning is needed.  
 
 Rebalancing/partitioning strategy currently checks only the CPU load of the local node and chooses a random remote server instance if rebalancing is needed.
 
@@ -22,7 +22,7 @@ Ignite-client is responsible for extracting data from all/some remote nodes conc
 
 It incorporates 1 service: 
 
-- Extraction service: which is responsible for extracting the queried data from the necessary server instances via socket connection. It can either be used to extract the metadata that store the information about the rebalanced source/target instances or to extract stored data from all necessary server instances in a single query. 
+- (*IN PROGRESS*) Extraction service: which is responsible for extracting the queried data from the necessary server instances via socket connection. It can either be used to extract the metadata that store the information about the rebalanced source/target instances or to extract stored data from all necessary server instances in a single query. 
 
 ## Deployment
 
@@ -34,6 +34,5 @@ Each instance image can be created using the `build_image.sh` script in the resp
 
 The available ports that are exposed from the Docker deployment through the above process are:
 
-- 50000: Ingestion service for the Ignite-server instance
-- 50001: Extraction service for the Ignite-server instance 
+- 50000: REST API for the Ignite-server instance
 - 50002: Extraction service for the Ignite-client instance

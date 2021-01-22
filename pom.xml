@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.auth.csd.datalab</groupId>
     <artifactId>Ignite-Server</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
     <build>
         <plugins>
             <plugin>
@@ -50,6 +50,11 @@
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20200518</version>
+        </dependency>
+        <dependency>
+            <groupId>org.rapidoid</groupId>
+            <artifactId>rapidoid-quick</artifactId>
+            <version>5.5.5</version>
         </dependency>
     </dependencies>
 
