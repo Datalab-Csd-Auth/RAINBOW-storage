@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 29-01-2021 (hotfix)
+
+### Changed 
+
+- Changed `get` filter to get all metrics when there is no metricID or entityID keyword
+
 ## [1.2.0] - 29-01-2021
 
 ### Added 

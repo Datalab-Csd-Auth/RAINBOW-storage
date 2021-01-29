@@ -87,10 +87,10 @@ public class DataService implements DataInterface {
 
     private void ingestData(HashMap<String, InputJson> data) {
         for (Map.Entry<String, InputJson> entry : data.entrySet()) {
-                myLatest.put(entry.getKey(), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
-                MetricKey metricTmp = new MetricKey(entry.getValue());
-                myHistorical.put(metricTmp, new Metric(entry.getValue().val));
-                myMeta.put(new MetaMetricKey(entry.getValue()), new MetaMetric(entry.getValue()));
+            myLatest.put(entry.getKey(), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
+            MetricKey metricTmp = new MetricKey(entry.getValue());
+            myHistorical.put(metricTmp, new Metric(entry.getValue().val));
+            myMeta.put(new MetaMetricKey(entry.getValue()), new MetaMetric(entry.getValue()));
         }
     }
 
@@ -153,6 +153,15 @@ public class DataService implements DataInterface {
         return metrics;
     }
 
+    private ArrayList<String> getAllMetrics() {
+        ArrayList<String> metrics = new ArrayList<>();
+        SqlFieldsQuery sql = new SqlFieldsQuery("select metricID from METAMETRIC");
+        try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
+            for (List<?> row : cursor)
+                metrics.add(row.get(0).toString());
+        }
+        return metrics;
+    }
 
     private class CustomHttpServer extends AbstractHttpServer {
 
@@ -203,6 +212,8 @@ public class DataService implements DataInterface {
                                 for (Object ent : entities) { //Store metric ids to list
                                     ids.add(ent.toString());
                                 }
+                            } else {
+                                ids = getAllMetrics();
                             }
                             if (obj.has("latest") && obj.getBoolean("latest")) { //Get only the latest data
                                 result = extractLatestData(ids);
