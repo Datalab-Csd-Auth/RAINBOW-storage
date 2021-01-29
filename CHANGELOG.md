@@ -47,6 +47,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance)
 - 1 service for `Ignite-client` (Extraction)
 
+[1.2.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.1
 [1.2.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.0
 [1.1.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.1.0
 [1.0.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.0.1
