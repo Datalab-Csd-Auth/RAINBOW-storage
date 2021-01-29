@@ -1,0 +1,55 @@
+version: "3.2"
+
+networks:
+  ignite-net:
+
+services:
+  ignite-server:
+    image: ignite-server:1.1.0
+    hostname: server-{{ .Task.Slot }}
+    networks:
+      - ignite-net
+    environment:
+      OPTION_LIBS: ignite-zookeeper
+      IGNITE_WORK_DIR: /storage
+    volumes:
+      - ./data:/storage
+    ports:
+      #API Sockets
+      - target: 50000
+        published: 50000
+        protocol: tcp
+        mode: host
+      #Let thin clients connect
+      - target: 10800
+        published: 10800
+        protocol: tcp
+        mode: host
+    deploy:
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  zoo1:
+    image: zookeeper:3.4
+    hostname: zoo1
+    networks:
+      - ignite-net
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=0.0.0.0:2888:3888
+    ports:
+      - target: 2181
+        published: 2181
+        protocol: tcp
+        mode: host
+    deploy:
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
