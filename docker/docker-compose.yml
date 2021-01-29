@@ -5,15 +5,15 @@ networks:
 
 services:
   ignite-server:
-    image: ignite-server:1.1.0
+    image: ignite-server:1.2.0
     hostname: server-{{ .Task.Slot }}
     networks:
       - ignite-net
     environment:
       OPTION_LIBS: ignite-zookeeper
-      IGNITE_WORK_DIR: /storage
-    volumes:
-      - ./data:/storage
+#      IGNITE_WORK_DIR: /storage
+#    volumes:
+#      - ./data:/storage
     ports:
       #API Sockets
       - target: 50000
