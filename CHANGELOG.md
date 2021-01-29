@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 29-01-2021
+
+### Added 
+
+- Caches for storing historical data and metadata for all monitoring metrics
+- New filters for the `get` endpoint of `Ignite-server` in order to filter out returned values based on metricID/entityID and time period or latest values.
+- `docker-compose.yml` file to deploy the solution with a single Ignite service and a zookeeper
+
 ## [1.1.0] - 22-01-2021
 
 ### Added 
@@ -33,6 +41,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance)
 - 1 service for `Ignite-client` (Extraction)
 
+[1.2.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.0
 [1.1.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.1.0
 [1.0.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.0.1
 [1.0.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.0.0
