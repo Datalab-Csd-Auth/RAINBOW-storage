@@ -5,7 +5,7 @@ networks:
 
 services:
   ignite-server:
-    image: ignite-server:1.2.0
+    image: ignite-server:1.2.1
     hostname: server-{{ .Task.Slot }}
     networks:
       - ignite-net
