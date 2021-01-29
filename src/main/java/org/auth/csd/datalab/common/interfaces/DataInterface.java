@@ -1,16 +1,15 @@
 package org.auth.csd.datalab.common.interfaces;
 
 import org.apache.ignite.services.Service;
-import org.auth.csd.datalab.common.helpers.Metric;
-
-import java.util.HashMap;
-import java.util.HashSet;
 
 public interface DataInterface extends Service {
     /** Service name */
-    public static final String SERVICE_NAME = "IngestionService";
+    public static final String SERVICE_NAME = "DataService";
 
-    public void ingestData(HashMap<String, Metric> data);
+//    public void ingestData(HashMap<String, InputJson> data);
+//
+//    public HashMap<MetricKey, Metric> extractLatestData(List<String> search);
+//
+//    public HashMap<MetricKey, Metric> extractHistoricalData(List<String> search, Long min, Long max);
 
-    public HashSet<String> extractData(HashSet<String> search);
 }

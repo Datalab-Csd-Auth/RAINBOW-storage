@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.auth.csd.datalab</groupId>
     <artifactId>Ignite-Server</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <build>
         <plugins>
             <plugin>
@@ -44,6 +44,11 @@
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-zookeeper</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.ignite</groupId>
+            <artifactId>ignite-indexing</artifactId>
             <version>2.9.0</version>
         </dependency>
         <dependency>

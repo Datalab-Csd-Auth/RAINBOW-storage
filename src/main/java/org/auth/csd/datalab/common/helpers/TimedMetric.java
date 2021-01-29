@@ -1,20 +1,20 @@
 package org.auth.csd.datalab.common.helpers;
 
-import org.apache.ignite.cache.query.annotations.QuerySqlField;
+public class TimedMetric {
 
-public class Metric {
-
-    public Metric(Double val) {
+    public TimedMetric(Double val, Long timestamp) {
         this.val = val;
+        this.timestamp = timestamp;
     }
 
-    @QuerySqlField
     public Double val;
+    public Long timestamp;
 
     @Override
     public String toString() {
         return "{" +
                 " \"value\": \"" + val + "\"" +
+                ", \"timestamp\": \"" + timestamp + "\"" +
                 '}';
     }
 }

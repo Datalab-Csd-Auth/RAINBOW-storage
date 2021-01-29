@@ -16,6 +16,15 @@ It incorporates 3 different services:
 
 Rebalancing/partitioning strategy currently checks only the CPU load of the local node and chooses a random remote server instance if rebalancing is needed.
 
+## Caches
+
+Ignite uses caches for both persistent and in-memory data. Ignite-server uses 3 caches for storage of both persistent and in-memory data. Ignite-client uses 1 cache for metadata of the Ignite-server instances.
+
+- *LatestMonitoring* cache is used for in-memory storage of the latest values for every monitoring metric.
+- *HistoricalMonitoring* cache is used for persistent (currently in-memory) storage of the historical values for every monitoring metric.
+- *MetaMonitoring* cache is used for persistent (currently in-memory) storage of metadata for every monitorinc metric and the entity they belong to.
+
+
 ## Ignite-client
 
 Ignite-client is responsible for extracting data from all/some remote nodes concurrently. 
