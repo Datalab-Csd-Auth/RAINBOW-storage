@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2] - 04-02-2021 (bugfix)
+
+### Changed 
+
+- Fixed bug on sql queries with WHERE clause
+- Changed zookeeper service name
+
 ## [1.2.1] - 29-01-2021 (hotfix)
 
 ### Changed 
