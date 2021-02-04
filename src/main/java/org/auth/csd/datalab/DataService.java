@@ -8,7 +8,6 @@ import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.configuration.CacheConfiguration;
-import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.lang.IgniteBiPredicate;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
@@ -107,7 +106,7 @@ public class DataService implements DataInterface {
 
     private String extractHistoricalData(String metric, Long min, Long max) {
         List<String> res = new ArrayList<>();
-        SqlFieldsQuery sql = new SqlFieldsQuery("select metricID, timestamp, val from METRIC WHERE metricID = " + metric + " AND timestamp >= " + min + " AND timestamp <= " + max);
+        SqlFieldsQuery sql = new SqlFieldsQuery("select metricID, timestamp, val from METRIC WHERE metricID = '" + metric + "' AND timestamp >= " + min + " AND timestamp <= " + max);
         try (QueryCursor<List<?>> cursor = myHistorical.query(sql)) {
             for (List<?> row : cursor) {
                 Long time = (Long) row.get(1);
@@ -122,7 +121,7 @@ public class DataService implements DataInterface {
     private HashMap<String, String> extractMeta(List<String> search) {
         HashMap<String, String> meta = new HashMap<>();
         for (String metric : search) {
-            SqlFieldsQuery sql = new SqlFieldsQuery("select entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter from METAMETRIC WHERE metricID = " + metric);
+            SqlFieldsQuery sql = new SqlFieldsQuery("select entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter from METAMETRIC WHERE metricID = '" + metric + "'");
             try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
                 for (List<?> row : cursor) {
                     String res = " \"entityID\": \"" + row.get(0) + "\"" +
@@ -144,7 +143,7 @@ public class DataService implements DataInterface {
     private List<String> getMetricID(List<String> entities) {
         List<String> metrics = new ArrayList<>();
         for (String entity : entities) {
-            SqlFieldsQuery sql = new SqlFieldsQuery("select metricID from METAMETRIC WHERE entityID = " + entity);
+            SqlFieldsQuery sql = new SqlFieldsQuery("select metricID from METAMETRIC WHERE entityID = '" + entity + "'");
             try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
                 for (List<?> row : cursor)
                     metrics.add(row.get(0).toString());
@@ -234,7 +233,7 @@ public class DataService implements DataInterface {
                     //Join meta with values
                     List<String> metaValues = new ArrayList<>();
                     for (String metric : result.keySet()) {
-                        metaValues.add(" { \"metricID\": " + metric + " , " + result.get(metric) + " , " + meta.getOrDefault(metric, "") + " } ");
+                        metaValues.add(" { \"metricID\": \"" + metric + "\" , " + result.get(metric) + " , " + meta.getOrDefault(metric, "") + " } ");
                     }
                     String finalRes = "{\"monitoring\": [ " + String.join(", ", metaValues) + " ]} ";
                     return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
