@@ -33,7 +33,7 @@
         <property name="peerClassLoadingEnabled" value="true"/>
         <property name="discoverySpi">
             <bean class="org.apache.ignite.spi.discovery.zk.ZookeeperDiscoverySpi">
-                <property name="zkConnectionString" value="zoo1:2181"/>
+                <property name="zkConnectionString" value="zookeeper:2181"/>
                 <property name="sessionTimeout" value="30000"/>
                 <property name="zkRootPath" value="/ignite"/>
                 <property name="joinTimeout" value="10000"/>
