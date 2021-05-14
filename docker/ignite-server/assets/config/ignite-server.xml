@@ -45,11 +45,11 @@
                     <property name="name" value="LatestMonitoring"/>
                     <property name="cacheMode" value="LOCAL"/>
                 </bean>
-                <bean class="org.apache.ignite.configuration.CacheConfiguration">
+<!--                <bean class="org.apache.ignite.configuration.CacheConfiguration">
                     <property name="name" value="Metadata"/>
                     <property name="cacheMode" value="PARTITIONED"/>
                     <property name="backups" value="1"/>
-                </bean>
+                </bean>-->
             </list>
         </property>
         <!--Persistence region-->
@@ -80,20 +80,18 @@
                         <bean class="org.auth.csd.datalab.common.filter.DataFilter"/>
                     </property>
                 </bean>
-                <bean class="org.apache.ignite.services.ServiceConfiguration">
-                    <!-- Unique service name -->
+               <!-- <bean class="org.apache.ignite.services.ServiceConfiguration">
                     <property name="name" value="RebalanceService"/>
                     <property name="service">
                         <bean class="org.auth.csd.datalab.RebalanceService"/>
                     </property>
-                    <!-- Only one instance of the service can be deployed on a single node. -->
                     <property name="maxPerNodeCount" value="1"/>
                     <property name="nodeFilter">
                         <bean class="org.auth.csd.datalab.common.filter.DataFilter"/>
                     </property>
-                </bean>
+                </bean>-->
             </list>
         </property>
-        <property name="consistentId" value="true" />
+        <!--<property name="consistentId" value="true" />-->
     </bean>
 </beans>

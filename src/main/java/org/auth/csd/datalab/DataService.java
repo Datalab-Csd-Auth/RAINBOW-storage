@@ -214,17 +214,19 @@ public class DataService implements DataInterface {
                             } else {
                                 ids = getAllMetrics();
                             }
-                            if (obj.has("latest") && obj.getBoolean("latest")) { //Get only the latest data
-                                result = extractLatestData(ids);
-                            } else if (obj.has("from") && obj.has("to")) {
-                                long from = obj.getLong("from");
-                                long to = obj.getLong("to");
-                                for (String metric : ids) {
-                                    result.put(metric, extractHistoricalData(metric, from, to));
+                            if(!ids.isEmpty()) {
+                                if (obj.has("latest") && obj.getBoolean("latest")) { //Get only the latest data
+                                    result = extractLatestData(ids);
+                                } else if (obj.has("from") && obj.has("to")) {
+                                    long from = obj.getLong("from");
+                                    long to = obj.getLong("to");
+                                    for (String metric : ids) {
+                                        result.put(metric, extractHistoricalData(metric, from, to));
+                                    }
                                 }
+                                //Get metadata
+                                meta = extractMeta(ids);
                             }
-                            //Get metadata
-                            meta = extractMeta(ids);
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
