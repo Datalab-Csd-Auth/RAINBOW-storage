@@ -24,6 +24,7 @@ Ignite uses caches for both persistent and in-memory data. Ignite-server uses 3 
 - *HistoricalMonitoring* cache is used for persistent (currently in-memory) storage of the historical values for every monitoring metric.
 - *MetaMonitoring* cache is used for persistent (currently in-memory) storage of metadata for every monitorinc metric and the entity they belong to.
 
+Persistence and eviction rate are implemented. **BUT** if persistence is enabled the cluster needs to be activated through a shell command or API call from one of the nodes.
 
 ## Ignite-client
 

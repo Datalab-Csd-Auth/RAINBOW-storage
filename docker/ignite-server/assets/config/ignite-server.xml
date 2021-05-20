@@ -53,7 +53,7 @@
             </list>
         </property>
         <!--Persistence region-->
-        <!--<property name="dataStorageConfiguration">
+        <property name="dataStorageConfiguration">
             <bean class="org.apache.ignite.configuration.DataStorageConfiguration">
                 <property name="dataRegionConfigurations">
                     <list>
@@ -64,7 +64,7 @@
                     </list>
                 </property>
             </bean>
-        </property>-->
+        </property>
         <!--Services-->
         <property name="serviceConfiguration">
             <list>

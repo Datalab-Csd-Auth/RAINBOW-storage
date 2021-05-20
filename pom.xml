@@ -28,28 +28,30 @@
         </plugins>
     </build>
 
-
+    <properties>
+        <ignite.version>2.9.0</ignite.version>
+    </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-core</artifactId>
-            <version>2.9.0</version>
+            <version>${ignite.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-spring</artifactId>
-            <version>2.9.0</version>
+            <version>${ignite.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-zookeeper</artifactId>
-            <version>2.9.0</version>
+            <version>${ignite.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-indexing</artifactId>
-            <version>2.9.0</version>
+            <version>${ignite.version}</version>
         </dependency>
         <dependency>
             <groupId>org.json</groupId>
