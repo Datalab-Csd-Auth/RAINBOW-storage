@@ -25,7 +25,6 @@ import org.rapidoid.net.impl.RapidoidHelper;
 
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
-import javax.cache.expiry.ExpiryPolicy;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -139,7 +138,8 @@ public class DataService implements DataInterface {
         }
     }
 
-    private HashMap<String, String> extractLatestData(List<String> search) {
+    @Override
+    public HashMap<String, String> extractLatestData(List<String> search) {
         HashMap<String, String> data = new HashMap<>();
         IgniteBiPredicate<String, TimedMetric> filter;
         if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
@@ -150,7 +150,8 @@ public class DataService implements DataInterface {
         return data;
     }
 
-    private String extractHistoricalData(String metric, Long min, Long max) {
+    @Override
+    public String extractHistoricalData(String metric, Long min, Long max) {
         List<String> res = new ArrayList<>();
         SqlFieldsQuery sql = new SqlFieldsQuery("select metricID, timestamp, val from METRIC WHERE metricID = '" + metric + "' AND timestamp >= " + min + " AND timestamp <= " + max);
         try (QueryCursor<List<?>> cursor = myHistorical.query(sql)) {

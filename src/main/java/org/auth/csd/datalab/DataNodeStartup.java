@@ -14,7 +14,7 @@ public class DataNodeStartup {
         Ignite ignite = Ignition.start("/opt/assets/config/ignite-server.xml");
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
-        ignite.cluster().baselineAutoAdjustTimeout(30000);
+        ignite.cluster().baselineAutoAdjustTimeout(5);
 
         System.out.println(ignite.cluster().localNode().id());
 
