@@ -1,4 +1,4 @@
-package org.auth.csd.datalab;
+package org.auth.csd.datalab.services;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;

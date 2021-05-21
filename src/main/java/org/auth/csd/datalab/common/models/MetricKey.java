@@ -1,4 +1,4 @@
-package org.auth.csd.datalab.common.helpers;
+package org.auth.csd.datalab.common.models;
 
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
 

@@ -26,7 +26,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>org.auth.csd.datalab.DataNodeStartup</mainClass>
+                            <mainClass>org.auth.csd.datalab.NodeStartup</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -35,7 +35,7 @@
     </build>
 
     <properties>
-        <ignite.version>2.9.0</ignite.version>
+        <ignite.version>2.10.0</ignite.version>
     </properties>
 
     <dependencies>
@@ -49,11 +49,16 @@
             <artifactId>ignite-spring</artifactId>
             <version>${ignite.version}</version>
         </dependency>
-        <dependency>
+        <!--<dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-zookeeper</artifactId>
             <version>${ignite.version}</version>
-        </dependency>
+        </dependency>-->
+        <!--<dependency>
+            <groupId>org.apache.ignite</groupId>
+            <artifactId>ignite-kubernetes</artifactId>
+            <version>${ignite.version}</version>
+        </dependency>-->
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-indexing</artifactId>
