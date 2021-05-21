@@ -36,6 +36,10 @@ It incorporates 1 service:
 
 ## Deployment
 
+In an **actual deployment** a single instance needs to be deployed first in order to create the cluster. If many instances are deployed concurrently some of them may not be able to enter the cluster since each of them tries to create one.
+
+If **persistence is enabled**, after the first instance is deployed and the cluster is created a job needs to run to activate the cluster using the command `./apache-ignite/bin/control.sh --set-state active --yes` from inside the ignite instance. This initializes the cluster for every other/new instances. If the state is not changed to **active** then the cluster will not work.
+
 The `docker-swarm.yml` file can be used to deploy 2 instances of `ignite-server` and 1 instance of `ignite-client` nodes on available swarm nodes. It also deploys [**Apache Zookeeper**](https://zookeeper.apache.org/) instances needed to store metadata on the cluster nodes.
 
 Each instance image can be created using the `build_image.sh` script in the respective folder.
