@@ -5,26 +5,25 @@ networks:
 
 services:
   ignite-server:
-    image: ignite-server:1.2.2
+    image: rainbow-storage:1.3.0
     hostname: server-{{ .Task.Slot }}
     networks:
       - ignite-net
     environment:
-      OPTION_LIBS: ignite-zookeeper
-#      IGNITE_WORK_DIR: /storage
+      NODE: SERVER
+      DISCOVERY: ignite-server
+      HOSTNAME: server-{{ .Task.Slot }}
 #    volumes:
 #      - ./data:/storage
     ports:
-      #API Sockets
       - target: 50000
         published: 50000
         protocol: tcp
         mode: host
-      #Let thin clients connect
-      - target: 10800
-        published: 10800
-        protocol: tcp
-        mode: host
+#      - target: 10800
+#        published: 10800
+#        protocol: tcp
+#        mode: host
     deploy:
       endpoint_mode: dnsrr
       restart_policy:
@@ -33,23 +32,3 @@ services:
         max_attempts: 3
         window: 120s
 
-  zookeeper:
-    image: zookeeper:3.4
-    hostname: zookeeper
-    networks:
-      - ignite-net
-    environment:
-      ZOO_MY_ID: 1
-      ZOO_SERVERS: server.1=0.0.0.0:2888:3888
-    ports:
-      - target: 2181
-        published: 2181
-        protocol: tcp
-        mode: host
-    deploy:
-      endpoint_mode: dnsrr
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s

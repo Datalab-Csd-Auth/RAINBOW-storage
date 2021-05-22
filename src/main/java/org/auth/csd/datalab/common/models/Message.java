@@ -1,4 +1,4 @@
-package org.auth.csd.datalab.common.helpers;
+package org.auth.csd.datalab.common.models;
 
 public class Message {
 
