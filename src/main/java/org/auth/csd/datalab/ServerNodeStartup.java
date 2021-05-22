@@ -18,8 +18,6 @@ import org.auth.csd.datalab.services.DataService;
 
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -42,20 +40,12 @@ public class ServerNodeStartup {
     public static final String persistenceRegion = "Persistent_Region";
     public static final int evictionHours = 168;
 
-    public static void createServer() throws IgniteException, UnknownHostException {
-
-        String discovery = (readEnvVariable("DISCOVERY") != null) ? readEnvVariable("DISCOVERY") : "localhost";
-        String hostname = InetAddress.getLocalHost().getHostName();
-        System.out.println(discovery);
-        System.out.println(hostname);
-
+    public static void createServer(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery,hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(10);
-
         System.out.println(ignite.cluster().localNode().id());
-
     }
 
     private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
@@ -67,7 +57,7 @@ public class ServerNodeStartup {
         cfg.setUserAttributes(myAtrr);
         cfg.setLocalHost(hostname);
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
-                .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(","))))
+                .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
 
 

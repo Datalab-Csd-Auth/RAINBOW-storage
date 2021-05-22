@@ -12,6 +12,7 @@ services:
     environment:
       NODE: SERVER
       DISCOVERY: ignite-server
+      HOSTNAME: server-{{ .Task.Slot }}
 #    volumes:
 #      - ./data:/storage
     ports:

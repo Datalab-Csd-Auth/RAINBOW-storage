@@ -4,7 +4,7 @@ echo "Removing old jars"
 mkdir assets
 rm assets/*.jar
 echo "Building the fat jar"
-(cd ../../ ; mvn clean compile assembly:single)
-cp ../../target/Ignite-Server-"$ignite"-jar-with-dependencies.jar assets/ignite.jar
+(cd ../../ ; mvn clean compile test assembly:single)
+cp ../../target/rainbow-storage-"$ignite"-jar-with-dependencies.jar assets/ignite.jar
 echo "Building the Ignite server image"
 docker build -t rainbow-storage:"$ignite" .

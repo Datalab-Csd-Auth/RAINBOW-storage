@@ -10,13 +10,10 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.ClientFilter;
 import org.auth.csd.datalab.services.ClientExtractionService;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
 import static org.auth.csd.datalab.common.interfaces.ClientExtractionInterface.SERVICE_NAME;
 
 /**
@@ -24,16 +21,9 @@ import static org.auth.csd.datalab.common.interfaces.ClientExtractionInterface.S
  */
 public class ClientNodeStartup {
 
-    public static void createClient() throws IgniteException, UnknownHostException {
-
-        String discovery = (readEnvVariable("DISCOVERY") != null) ? readEnvVariable("DISCOVERY") : "localhost";
-        String hostname = InetAddress.getLocalHost().getHostName();
-        System.out.println(discovery);
-        System.out.println(hostname);
-
+    public static void createClient(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         System.out.println(ignite.cluster().localNode().id());
-
     }
 
     private static IgniteConfiguration igniteConfiguration(String discovery,String hostname) {
@@ -45,7 +35,7 @@ public class ClientNodeStartup {
         cfg.setClientMode(true);
         cfg.setLocalHost(hostname);
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
-                .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(","))))
+                .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
 
         cfg.setServiceConfiguration(serviceConfiguration());
