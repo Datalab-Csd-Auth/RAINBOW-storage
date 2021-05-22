@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.0] - 22-05-2021
+
+### Added 
+
+- Client REST API to extract monitoring data from all ignite server nodes.
+- In-memory key-value cache for user application data.
+- Persistence options for historical and metadata caches
+- Eviction options for historical and metadata caches
+- Unit tests for the main functions of the Server instances (ingest, extract monitoring data) 
+
+### Changed 
+
+- Merged the docker images (client and server) into one image.
+- The docker image starts with a base of JDK 1.8 and Alpine instead of Ignite.
+- Ignite is initialized through the code main function.
+- Server or Client nodes are decided through an environment variable.
+- Configuration of instances is implemented inside the code instead of XML files.
+- Changed the `DataService` interface and implementation to incorporate 2 public classes that can be used from both server and client APIs.
+
 ## [1.2.2] - 04-02-2021 (bugfix)
 
 ### Changed 
@@ -54,6 +73,8 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance)
 - 1 service for `Ignite-client` (Extraction)
 
+[1.3.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.0
+[1.2.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.2
 [1.2.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.1
 [1.2.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.0
 [1.1.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.1.0

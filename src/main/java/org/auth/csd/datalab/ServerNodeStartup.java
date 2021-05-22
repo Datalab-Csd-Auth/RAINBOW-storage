@@ -21,6 +21,7 @@ import javax.cache.expiry.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
@@ -38,7 +39,7 @@ public class ServerNodeStartup {
     public static final String metaCacheName = "MetaMonitoring";
     public static final String appCacheName = "ApplicationData";
     public static final String persistenceRegion = "Persistent_Region";
-    public static final int evictionHours = 168;
+    public static  int evictionHours = 168;
 
     public static void createServer(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery,hostname));
@@ -62,6 +63,12 @@ public class ServerNodeStartup {
 
 
         if(persistence){
+            try {
+                String evict = readEnvVariable("EVICTION");
+                if (evict != null) evictionHours = Integer.parseInt(Objects.requireNonNull(readEnvVariable("EVICTION")));
+            } catch (NumberFormatException e) {
+                System.out.println("Input Eviction value cannot be parsed to Integer. Default value will be used.");
+            }
             DataStorageConfiguration dsc = new DataStorageConfiguration();
             DataRegionConfiguration regionWithPersistence = new DataRegionConfiguration();
             regionWithPersistence.setName(persistenceRegion);
