@@ -24,6 +24,7 @@ Ignite uses caches for both persistent and in-memory data. Ignite-server uses 3 
 - *HistoricalMonitoring* cache is used for persistent (currently in-memory) storage of the historical values for every monitoring metric.
 - *MetaMonitoring* cache is used for persistent (currently in-memory) storage of metadata for every monitorinc metric and the entity they belong to.
 
+Persistence and eviction rate are implemented. **BUT** if persistence is enabled the cluster needs to be activated through a shell command or API call from one of the nodes.
 
 ## Ignite-client
 
@@ -34,6 +35,10 @@ It incorporates 1 service:
 - (*IN PROGRESS*) Extraction service: which is responsible for extracting the queried data from the necessary server instances via socket connection. It can either be used to extract the metadata that store the information about the rebalanced source/target instances or to extract stored data from all necessary server instances in a single query. 
 
 ## Deployment
+
+In an **actual deployment** a single instance needs to be deployed first in order to create the cluster. If many instances are deployed concurrently some of them may not be able to enter the cluster since each of them tries to create one.
+
+If **persistence is enabled**, after the first instance is deployed and the cluster is created a job needs to run to activate the cluster using the command `./apache-ignite/bin/control.sh --set-state active --yes` from inside the ignite instance. This initializes the cluster for every other/new instances. If the state is not changed to **active** then the cluster will not work.
 
 The `docker-swarm.yml` file can be used to deploy 2 instances of `ignite-server` and 1 instance of `ignite-client` nodes on available swarm nodes. It also deploys [**Apache Zookeeper**](https://zookeeper.apache.org/) instances needed to store metadata on the cluster nodes.
 
