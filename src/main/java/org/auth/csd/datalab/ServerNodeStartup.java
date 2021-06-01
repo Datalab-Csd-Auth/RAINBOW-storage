@@ -38,6 +38,7 @@ public class ServerNodeStartup {
     public static final String historicalCacheName = "HistoricalMonitoring";
     public static final String metaCacheName = "MetaMonitoring";
     public static final String appCacheName = "ApplicationData";
+    public static final String analyticsCacheName = "Analytics";
     public static final String persistenceRegion = "Persistent_Region";
     public static  int evictionHours = 168;
 
@@ -60,7 +61,6 @@ public class ServerNodeStartup {
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
-
 
         if(persistence){
             try {
@@ -94,14 +94,16 @@ public class ServerNodeStartup {
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
 
+        CacheConfiguration<String, TimedMetric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
+        analyticsCfg.setCacheMode(CacheMode.LOCAL);
 
         if(app_cache) {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg,
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,
                     new CacheConfiguration<>(appCacheName)
                             .setCacheMode(CacheMode.LOCAL)
             );
         }else{
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg);
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);
         }
         cfg.setServiceConfiguration(serviceConfiguration());
 

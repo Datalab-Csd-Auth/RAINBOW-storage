@@ -18,12 +18,12 @@ public class NodeStartup {
     public static void main(String[] args) throws IgniteException, UnknownHostException {
         //Get instance type
         String instance = (readEnvVariable("NODE") != null && Objects.equals(readEnvVariable("NODE"), "CLIENT")) ? "CLIENT" : "SERVER";
+        //Get hostname
+        String hostname = (readEnvVariable("HOSTNAME") != null) ? readEnvVariable("HOSTNAME") : InetAddress.getLocalHost().getHostName();
         //Get discovery servers
         String discovery = (readEnvVariable("DISCOVERY") != null) ? readEnvVariable("DISCOVERY") : "localhost";
-        //Get hostname
-        String hostname = InetAddress.getLocalHost().getHostName();
-        System.out.println(discovery);
-        System.out.println(hostname);
+        System.out.println("Discovery servers: " + discovery);
+        System.out.println("Hostname: " + hostname);
         if(instance.equals("CLIENT")) ClientNodeStartup.createClient(discovery, hostname);
         else ServerNodeStartup.createServer(discovery, hostname);
     }

@@ -13,8 +13,8 @@ services:
     environment:
       NODE: SERVER
       DISCOVERY: server-1
-      PERSISTENCE: "true"
-      APP_CACHE: "true"
+      #PERSISTENCE: "true"
+      #APP_CACHE: "true"
     ports:
       - target: 50000
         published: 50000
@@ -33,28 +33,28 @@ services:
         max_attempts: 3
         window: 120s
 
-  ignite-client:
-    image: rainbow-storage:1.3.0
-    hostname: client-{{ .Task.Slot }}
-    networks:
-      - ignite-net
-    environment:
-      NODE: CLIENT
-      DISCOVERY: server-1
-    ports:
-      - target: 50001
-        published: 50001
-        protocol: tcp
-        mode: host
-    deploy:
-      endpoint_mode: dnsrr
-      replicas: 1
-      placement:
-        constraints:
-          - 'node.role == manager'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+#  ignite-client:
+#    image: rainbow-storage:1.3.0
+#    hostname: client-{{ .Task.Slot }}
+#    networks:
+#      - ignite-net
+#    environment:
+#      NODE: CLIENT
+#      DISCOVERY: server-1
+#    ports:
+#      - target: 50001
+#        published: 50001
+#        protocol: tcp
+#        mode: host
+#    deploy:
+#      endpoint_mode: dnsrr
+#      replicas: 1
+#      placement:
+#        constraints:
+#          - 'node.role == manager'
+#      restart_policy:
+#        condition: on-failure
+#        delay: 5s
+#        max_attempts: 3
+#        window: 120s
 

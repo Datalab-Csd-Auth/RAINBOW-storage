@@ -51,6 +51,7 @@ The docker image can be created using the `build_image.sh` script in the respect
 Environment variables control the optional features such as persistence and the instance type (server, client). A list of all available variables that can be used in the docker container is below:
 
 1. **NODE**: The variable that controls the instance type. Available values are "**SERVER**" and "**CLIENT**". *Default value is "**SERVER**"*.
+2. **HOSTNAME**: The variable that is used for the container's hostname. If it is skipped, the program tries to find its own hostname using the `InetAddress` library.
 2. **DISCOVERY**: The variable that controls the discovery process. It should be a comma separated list of hostnames, e.g "**server-1,server-2**".
 3. **PERSISTENCE**: The variable that controls whether persistence is on or off. Available values are "**true**" and "**false**". *Default value is "**false**"*.
 4. **APP_CACHE**: The variable that controls whether the user-application cache is on or off. Available values are "**true**" and "**false**". *Default value is "**false**"*.
