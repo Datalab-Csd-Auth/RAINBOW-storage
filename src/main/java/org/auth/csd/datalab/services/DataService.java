@@ -37,6 +37,7 @@ public class DataService implements DataInterface {
     private IgniteCache<String, TimedMetric> myLatest;
     private IgniteCache<MetricKey, Metric> myHistorical;
     private IgniteCache<MetaMetricKey, MetaMetric> myMeta;
+    private IgniteCache<String, TimedMetric> myAnalytics;
     private IgniteCache<String, String> myApp = null;
 
     UUID localNode = null;
@@ -52,6 +53,7 @@ public class DataService implements DataInterface {
         myLatest = ignite.cache(latestCacheName);
         myHistorical = ignite.cache(historicalCacheName);
         myMeta = ignite.cache(metaCacheName);
+        myAnalytics = ignite.cache(analyticsCacheName);
         if(app_cache) myApp = ignite.cache(appCacheName);
         localNode = ignite.cluster().localNode().id();
         server = new CustomHttpServer().listen(50000);
@@ -86,6 +88,24 @@ public class DataService implements DataInterface {
         else filter = null;
         myApp.query(new ScanQuery<>(filter)).forEach(entry -> {
             data.put(entry.getKey(),entry.getValue());
+        });
+        return data;
+    }
+
+    //------------ANALYTICS----------------
+    private void ingestAnalytics(HashMap<String, TimedMetric> data) {
+        for (Map.Entry<String, TimedMetric> entry : data.entrySet()) {
+            myAnalytics.put(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private HashMap<String, String> extractAnalyticsData(List<String> search) {
+        HashMap<String, String> data = new HashMap<>();
+        IgniteBiPredicate<String, TimedMetric> filter;
+        if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
+        else filter = null;
+        myAnalytics.query(new ScanQuery<>(filter)).forEach(entry -> {
+            data.put(entry.getKey(),"\"val\": " + entry.getValue().val + " , \"timestamp\": " + entry.getValue().timestamp);
         });
         return data;
     }
@@ -175,6 +195,9 @@ public class DataService implements DataInterface {
 
         private final byte[] URI_PUT = "/put".getBytes();
         private final byte[] URI_GET = "/get".getBytes();
+        //Analytics cache
+        private final byte[] URI_ANALYTICS_PUT = "/analytics/put".getBytes();
+        private final byte[] URI_ANALYTICS_GET = "/analytics/get".getBytes();
         //App cache
         private final byte[] URI_APP_PUT = "/app/put".getBytes();
         private final byte[] URI_APP_GET = "/app/get".getBytes();
@@ -182,6 +205,7 @@ public class DataService implements DataInterface {
         @Override
         protected HttpStatus handle(Channel ctx, Buf buf, RapidoidHelper req) {
             if (!req.isGet.value) {
+                //PUT monitoring data
                 if (matches(buf, req.path, URI_PUT)) {
                     //Data structure for metrics
                     HashMap<String, InputJson> metrics = new HashMap<>();
@@ -209,6 +233,7 @@ public class DataService implements DataInterface {
                         return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data ingestion!"));
                     }
                 }
+                //GET monitoring data
                 else if (matches(buf, req.path, URI_GET)) {
                     HashMap<String, String> result = new HashMap<>();
                     //Read and parse json
@@ -244,6 +269,56 @@ public class DataService implements DataInterface {
                     String finalRes = "{\"monitoring\": [ " + String.join(", ", result.values()) + " ]} ";
                     return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
                 }
+                //PUT analytics data
+                else if (matches(buf, req.path, URI_ANALYTICS_PUT)) {
+                    HashMap<String, TimedMetric> data = new HashMap<>();
+                    //Read and parse json
+                    try {
+                        String body = buf.get(req.body);
+                        JSONObject obj = new JSONObject(body);
+                        //Get the monitoring keyword and parse the data
+                        JSONArray analytics = obj.getJSONArray("analytics");
+                        for (int i = 0; i < analytics.length(); i++) {
+                            JSONObject o = analytics.getJSONObject(i);
+                            if(o.has("key") && o.has("val") && o.has("timestamp")){
+                                data.put(o.getString("key"), new TimedMetric(o.getDouble("val"), o.getLong("timestamp")));
+                            }
+                        }
+                        ingestAnalytics(data);
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Ingestion successful!"));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data ingestion!"));
+                    }
+                }
+                //GET analytics data
+                else if (matches(buf, req.path, URI_ANALYTICS_GET)) {
+                    HashMap<String, String> result = new HashMap<>();
+                    //Read and parse json
+                    String body = buf.get(req.body);
+                    if (!body.equals("")) { //Check if body has filters
+                        JSONObject obj = new JSONObject(body);
+                        try {
+                            ArrayList<String> ids = new ArrayList<>();
+                            if (obj.has("key")) {
+                                JSONArray tmpKeys = obj.getJSONArray("key");
+                                ids.addAll(tmpKeys.toList().stream().map(Object::toString).collect(Collectors.toList()));
+                            }
+                            result = extractAnalyticsData(ids);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                        }
+                    }
+                    //Join meta with values
+                    List<String> metaValues = new ArrayList<>();
+                    for (String metric : result.keySet()) {
+                        metaValues.add(" { \"key\": \"" + metric + "\" , " + result.get(metric) + " } ");
+                    }
+                    String finalRes = "{\"analytics\": [ " + String.join(", ", metaValues) + " ]} ";
+                    return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
+                }
+                //PUT application data
                 else if (myApp != null && matches(buf, req.path, URI_APP_PUT)){
                     //Data structure for app data
                     HashMap<String, String> data = new HashMap<>();
@@ -266,6 +341,7 @@ public class DataService implements DataInterface {
                         return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data ingestion!"));
                     }
                 }
+                //GET application data
                 else if (myApp != null && matches(buf, req.path, URI_APP_GET)) {
                     HashMap<String, String> result = new HashMap<>();
                     //Read and parse json
