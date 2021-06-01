@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1] - 01-06-2021
+
+### Added 
+
+- In-memory cache for processed analytic results using a key-value model.
+- REST API routes for ingesting and extracting analytics data.
+- New optional environment variable for the container's hostname
+ 
 ## [1.3.0] - 22-05-2021
 
 ### Added 
@@ -73,6 +81,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance)
 - 1 service for `Ignite-client` (Extraction)
 
+[1.3.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.1
 [1.3.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.0
 [1.2.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.2
 [1.2.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.1
