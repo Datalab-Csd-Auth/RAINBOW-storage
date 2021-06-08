@@ -15,15 +15,13 @@ services:
       DISCOVERY: server-1
       #PERSISTENCE: "true"
       #APP_CACHE: "true"
+#    volumes:
+#      - ./data:/ignite
     ports:
       - target: 50000
         published: 50000
         protocol: tcp
         mode: host
-#      - target: 10800
-#        published: 10800
-#        protocol: tcp
-#        mode: host
     deploy:
       endpoint_mode: dnsrr
       replicas: 1

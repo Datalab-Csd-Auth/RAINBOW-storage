@@ -21,7 +21,7 @@ public class NodeStartup {
         //Get hostname
         String hostname = (readEnvVariable("HOSTNAME") != null) ? readEnvVariable("HOSTNAME") : InetAddress.getLocalHost().getHostName();
         //Get discovery servers
-        String discovery = (readEnvVariable("DISCOVERY") != null) ? readEnvVariable("DISCOVERY") : "localhost";
+        String discovery = (readEnvVariable("DISCOVERY") != null) ? readEnvVariable("DISCOVERY") : hostname;
         System.out.println("Discovery servers: " + discovery);
         System.out.println("Hostname: " + hostname);
         if(instance.equals("CLIENT")) ClientNodeStartup.createClient(discovery, hostname);
