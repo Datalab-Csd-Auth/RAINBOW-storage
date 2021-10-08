@@ -8,7 +8,6 @@ import org.apache.ignite.logger.log4j.Log4JLogger;
 import org.apache.ignite.services.ServiceConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
-import org.apache.ignite.spi.metric.jmx.JmxMetricExporterSpi;
 import org.apache.ignite.spi.metric.log.LogExporterSpi;
 import org.auth.csd.datalab.common.filter.DataFilter;
 import org.auth.csd.datalab.common.models.*;
@@ -30,20 +29,19 @@ import static org.auth.csd.datalab.common.interfaces.DataInterface.SERVICE_NAME;
  */
 public class ServerNodeStartup {
 
-    private static final Boolean persistence = readEnvVariable("PERSISTENCE") != null && Boolean.parseBoolean(readEnvVariable("PERSISTENCE"));
     public static final Boolean app_cache = readEnvVariable("APP_CACHE") != null && Boolean.parseBoolean(readEnvVariable("APP_CACHE"));
     public static final String latestCacheName = "LatestMonitoring";
     public static final String historicalCacheName = "HistoricalMonitoring";
     public static final String metaCacheName = "MetaMonitoring";
     public static final String appCacheName = "ApplicationData";
     public static final String analyticsCacheName = "Analytics";
-    private static  int evictionHours = 168;
-    private static final String defaultRegionName ="Default_Region";
+    private static int evictionHours = 168;
+    private static final String defaultRegionName = "Default_Region";
     private static final String persistenceRegionName = "Persistent_Region";
-
+    private static final String appRegionName = "App_Region";
 
     public static void createServer(String discovery, String hostname) throws IgniteException, IgniteCheckedException {
-        Ignite ignite = Ignition.start(igniteConfiguration(discovery,hostname));
+        Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(10);
@@ -62,7 +60,6 @@ public class ServerNodeStartup {
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
-
         //Set data regions
         DataStorageConfiguration dsc = new DataStorageConfiguration();
         //Default region
@@ -70,17 +67,29 @@ public class ServerNodeStartup {
         defaultRegion.setName(defaultRegionName);
         defaultRegion.setInitialSize(100 * 1024 * 1024);
         //TODO make it a variable
-        defaultRegion.setMaxSize(500 * 1024 * 1024);
+        defaultRegion.setMaxSize(512 * 1024 * 1024);
         defaultRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
         defaultRegion.setMetricsEnabled(true);
         dsc.setDefaultDataRegionConfiguration(defaultRegion);
         //Persistence region
-        if(persistence){
-            DataRegionConfiguration regionWithPersistence = new DataRegionConfiguration();
-            regionWithPersistence.setName(persistenceRegionName);
-            regionWithPersistence.setPersistenceEnabled(true);
-            regionWithPersistence.setMetricsEnabled(true);
-            dsc.setDataRegionConfigurations(regionWithPersistence);
+        DataRegionConfiguration regionWithPersistence = new DataRegionConfiguration();
+        regionWithPersistence.setName(persistenceRegionName);
+        regionWithPersistence.setInitialSize(100 * 1024 * 1024);
+        //TODO make it a variable
+        regionWithPersistence.setMaxSize(1024 * 1024 * 1024);
+        regionWithPersistence.setPersistenceEnabled(true);
+        regionWithPersistence.setMetricsEnabled(true);
+        dsc.setDataRegionConfigurations(regionWithPersistence);
+        //App-cache region
+        if (app_cache) {
+            DataRegionConfiguration appRegion = new DataRegionConfiguration();
+            appRegion.setName(appRegionName);
+            appRegion.setInitialSize(100 * 1024 * 1024);
+            //TODO make it a variable
+            appRegion.setMaxSize(200 * 1024 * 1024);
+            appRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
+            appRegion.setMetricsEnabled(true);
+            dsc.setDataRegionConfigurations(appRegion);
         }
         cfg.setDataStorageConfiguration(dsc);
 
@@ -97,39 +106,39 @@ public class ServerNodeStartup {
         CacheConfiguration<MetaMetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
         metaCfg.setCacheMode(CacheMode.LOCAL)
                 .setIndexedTypes(MetaMetricKey.class, MetaMetric.class)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
-                .setEagerTtl(true);
-        if(persistence) metaCfg.setDataRegionName(persistenceRegionName);
+                .setDataRegionName(persistenceRegionName);
         //Historical monitoring data cache
         CacheConfiguration<MetricKey, Metric> historicalCfg = new CacheConfiguration<>(historicalCacheName);
         historicalCfg.setCacheMode(CacheMode.LOCAL)
                 .setIndexedTypes(MetricKey.class, Metric.class)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
-                .setEagerTtl(true);
-        if(persistence) historicalCfg.setDataRegionName(persistenceRegionName);
+                .setDataRegionName(persistenceRegionName);
         //Analytics cache
         CacheConfiguration<String, TimedMetric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
         analyticsCfg.setCacheMode(CacheMode.LOCAL);
         //Optional application k-v cache
-        if(app_cache) {
+        if (app_cache) {
             cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,
                     new CacheConfiguration<>(appCacheName)
                             .setCacheMode(CacheMode.LOCAL)
+                            .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                            .setEagerTtl(true)
+                            .setDataRegionName(appRegionName)
             );
-        }else{
+        } else {
             cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);
         }
         cfg.setServiceConfiguration(serviceConfiguration());
 
-        //Logging
+        /*
+        //=============DEBUG Logging
         IgniteLogger log = new Log4JLogger("ignite-log4j.xml");
         cfg.setGridLogger(log);
 
-        //Metrics logging
-        //TODO check metric exporter & off heap size with 2 machines
-//        LogExporterSpi logExporter = new LogExporterSpi();
-//        logExporter.setPeriod(1000);
-//        cfg.setMetricExporterSpi(logExporter);
+        //=============DEBUG Metrics logging
+        LogExporterSpi logExporter = new LogExporterSpi();
+        logExporter.setPeriod(1000);
+        cfg.setMetricExporterSpi(logExporter);
+         */
 
         return cfg;
     }
