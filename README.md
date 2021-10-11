@@ -33,13 +33,13 @@ It incorporates 1 service:
 Ignite uses caches for both persistent and in-memory data. Ignite-server uses 3 caches for storage of both persistent and in-memory data. Ignite-client uses 1 cache for metadata of the Ignite-server instances.
 
 - *LatestMonitoring* cache is used for in-memory storage of the latest values for every monitoring metric.
-- *HistoricalMonitoring* cache is used for persistent (or in-memory) storage of the historical values for every monitoring metric.
-- *MetaMonitoring* cache is used for persistent (or in-memory) storage of metadata for every monitorinc metric and the entity they belong to.
+- *HistoricalMonitoring* cache is used for persistent storage of the historical values for every monitoring metric.
+- *MetaMonitoring* cache is used for persistent storage of metadata for every monitoring metric and the entity they belong to.
 - *Analytics* cache is used for in-memory storage of processed data from the Analytics component.
 
 For the user application data 1 in-memory key-value cache is used, namely **ApplicationData**.
 
-Persistence and eviction rate are optional. If persistence is enabled the cluster takes longer to initiate each new node and insert it into the baseline topology (auto-adjustment is on).
+With persistence enabled the cluster takes longer to initiate each new node and insert it into the baseline topology (auto-adjustment is on).
 
 ## Deployment
 
@@ -56,9 +56,8 @@ Environment variables control the optional features such as persistence and the 
 1. **NODE**: The variable that controls the instance type. Available values are "**SERVER**" and "**CLIENT**". *Default value is "**SERVER**"*.
 2. **HOSTNAME**: The variable that is used for the container's hostname. If it is skipped, the program tries to find its own hostname using the `InetAddress` library.
 2. **DISCOVERY**: The variable that controls the discovery process. It should be a comma separated list of hostnames, e.g "**server-1,server-2**".
-3. **PERSISTENCE**: The variable that controls whether persistence is on or off. Available values are "**true**" and "**false**". *Default value is "**false**"*.
 4. **APP_CACHE**: The variable that controls whether the user-application cache is on or off. Available values are "**true**" and "**false**". *Default value is "**false**"*.
-5. **EVICTION**: The variable that controls the eviction period when persistence is on. The value represents the eviction rate in hours from the creation of a data row. *Default value is "**168** hours (1 week)"*.
+5. **EVICTION**: The variable that controls the eviction period for in-memory data. The value represents the eviction rate in hours from the creation of a data row. *Default value is "**168** hours (1 week)"*.
 
 ## Docker ports
 

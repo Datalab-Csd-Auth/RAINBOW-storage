@@ -6,6 +6,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.client.IgniteClient;
 import org.apache.ignite.configuration.ClientConfiguration;
@@ -23,7 +24,7 @@ import java.util.Collection;
 public class IgniteTests {
 
     @BeforeAll
-    public static void startServer(){
+    public static void startServer() throws IgniteCheckedException {
         // Start ignite server
         ServerNodeStartup.createServer("localhost","localhost");
         waitForPort("localhost", 50000, 30000);

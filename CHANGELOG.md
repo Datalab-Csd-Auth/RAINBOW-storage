@@ -1,12 +1,26 @@
 # Changelog
 
+## [1.3.2] - 11-10-2021
+
+### Added
+
+- Maximum size (500MB) for default data region (for latest and analytics data).
+- Maximum size (1GB) for persistent data region (for historical and meta data).
+- New region with maximum size of 200MB for application data.
+- Gitlab CI/CD pipeline
+
+### Changed
+
+- Persistent is no longer optional. Historical and Metadata caches are persistent-only.
+- Dockerfile for gitlab CI/CD pipeline
+
 ## [1.3.1] - 01-06-2021
 
 ### Added 
 
 - In-memory cache for processed analytic results using a key-value model.
 - REST API routes for ingesting and extracting analytics data.
-- New optional environment variable for the container's hostname
+- New optional environment variable for the container's hostname.
  
 ## [1.3.0] - 22-05-2021
 
@@ -14,9 +28,9 @@
 
 - Client REST API to extract monitoring data from all ignite server nodes.
 - In-memory key-value cache for user application data.
-- Persistence options for historical and metadata caches
-- Eviction options for historical and metadata caches
-- Unit tests for the main functions of the Server instances (ingest, extract monitoring data) 
+- Persistence options for historical and metadata caches.
+- Eviction options for historical and metadata caches.
+- Unit tests for the main functions of the Server instances (ingest, extract monitoring data).
 
 ### Changed 
 
@@ -31,28 +45,28 @@
 
 ### Changed 
 
-- Fixed bug on sql queries with WHERE clause
-- Changed zookeeper service name
+- Fixed bug on sql queries with WHERE clause.
+- Changed zookeeper service name.
 
 ## [1.2.1] - 29-01-2021 (hotfix)
 
 ### Changed 
 
-- Changed `get` filter to get all metrics when there is no metricID or entityID keyword
+- Changed `get` filter to get all metrics when there is no metricID or entityID keyword.
 
 ## [1.2.0] - 29-01-2021
 
 ### Added 
 
-- Caches for storing historical data and metadata for all monitoring metrics
+- Caches for storing historical data and metadata for all monitoring metrics.
 - New filters for the `get` endpoint of `Ignite-server` in order to filter out returned values based on metricID/entityID and time period or latest values.
-- `docker-compose.yml` file to deploy the solution with a single Ignite service and a zookeeper
+- `docker-compose.yml` file to deploy the solution with a single Ignite service and a zookeeper.
 
 ## [1.1.0] - 22-01-2021
 
 ### Added 
 
-- Class for metrics with metadata
+- Class for metrics with metadata.
 
 ### Changed
 
@@ -64,23 +78,24 @@
 
 ### Added
 
-- Try-catch blocks incorporated on all input/output tasks for the `Ignite-server` services
-- Added conditions to check if there are available nodes for rebalancing and if the external node is still available on every rebalancing task
-- Added README and CHANGELOG files
+- Try-catch blocks incorporated on all input/output tasks for the `Ignite-server` services.
+- Added conditions to check if there are available nodes for rebalancing and if the external node is still available on every rebalancing task.
+- Added README and CHANGELOG files.
 
 ### Changed
 
-- Fixed `build_image.sh` script to automatically get the project's version from pom and create the image with this version
+- Fixed `build_image.sh` script to automatically get the project's version from pom and create the image with this version.
 
 ## [1.0.0] - 01-12-2020
 
 ### Added
 
-- Initial working version with starting services and instances
-- 2 instances of Ignite, `Ignite-server` and `Ignite-client` 
-- 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance)
-- 1 service for `Ignite-client` (Extraction)
+- Initial working version with starting services and instances.
+- 2 instances of Ignite, `Ignite-server` and `Ignite-client`.
+- 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
+- 1 service for `Ignite-client` (Extraction).
 
+[1.3.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.2
 [1.3.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.1
 [1.3.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.0
 [1.2.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.2
