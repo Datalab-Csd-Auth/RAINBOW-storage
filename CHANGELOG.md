@@ -1,15 +1,18 @@
 # Changelog
 
+## [1.3.2] - 11-10-2021
 
 ### Added
 
 - Maximum size (500MB) for default data region (for latest and analytics data).
 - Maximum size (1GB) for persistent data region (for historical and meta data).
 - New region with maximum size of 200MB for application data.
+- Gitlab CI/CD pipeline
 
 ### Changed
 
 - Persistent is no longer optional. Historical and Metadata caches are persistent-only.
+- Dockerfile for gitlab CI/CD pipeline
 
 ## [1.3.1] - 01-06-2021
 
@@ -92,6 +95,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.3.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.2
 [1.3.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.1
 [1.3.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.0
 [1.2.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.2.2
