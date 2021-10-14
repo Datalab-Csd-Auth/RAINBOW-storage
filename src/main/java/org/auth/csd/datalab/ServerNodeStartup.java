@@ -40,7 +40,7 @@ public class ServerNodeStartup {
     private static final String persistenceRegionName = "Persistent_Region";
     private static final String appRegionName = "App_Region";
 
-    public static void createServer(String discovery, String hostname) throws IgniteException, IgniteCheckedException {
+    public static void createServer(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
@@ -48,9 +48,9 @@ public class ServerNodeStartup {
         System.out.println(ignite.cluster().localNode().id());
     }
 
-    private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) throws IgniteCheckedException {
+    private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
         //Set cluster identification and custom parameters
-        System.setProperty("java.net.preferIPv4Stack", "true");
+        //System.setProperty("java.net.preferIPv4Stack", "true"); //Only use ipv4
         Map<String, Boolean> myAtrr = new HashMap<>();
         myAtrr.put("data.node", true);
         IgniteConfiguration cfg = new IgniteConfiguration();
@@ -76,7 +76,7 @@ public class ServerNodeStartup {
         regionWithPersistence.setName(persistenceRegionName);
         regionWithPersistence.setInitialSize(100 * 1024 * 1024);
         //TODO make it a variable
-        regionWithPersistence.setMaxSize(1024 * 1024 * 1024);
+        regionWithPersistence.setMaxSize(512 * 1024 * 1024);
         regionWithPersistence.setPersistenceEnabled(true);
         regionWithPersistence.setMetricsEnabled(true);
         dsc.setDataRegionConfigurations(regionWithPersistence);
@@ -86,7 +86,7 @@ public class ServerNodeStartup {
             appRegion.setName(appRegionName);
             appRegion.setInitialSize(100 * 1024 * 1024);
             //TODO make it a variable
-            appRegion.setMaxSize(200 * 1024 * 1024);
+            appRegion.setMaxSize(256 * 1024 * 1024);
             appRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
             appRegion.setMetricsEnabled(true);
             dsc.setDataRegionConfigurations(appRegion);

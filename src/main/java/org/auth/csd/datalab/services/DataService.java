@@ -6,6 +6,8 @@ import org.apache.ignite.IgniteCache;
 import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.cache.query.SqlFieldsQuery;
+import org.apache.ignite.cluster.ClusterGroup;
+import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.lang.IgniteBiPredicate;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
@@ -54,7 +56,7 @@ public class DataService implements DataInterface {
         myHistorical = ignite.cache(historicalCacheName);
         myMeta = ignite.cache(metaCacheName);
         myAnalytics = ignite.cache(analyticsCacheName);
-        if(app_cache) myApp = ignite.cache(appCacheName);
+        if (app_cache) myApp = ignite.cache(appCacheName);
         localNode = ignite.cluster().localNode().id();
         server = new CustomHttpServer().listen(50000);
     }
@@ -86,9 +88,7 @@ public class DataService implements DataInterface {
         IgniteBiPredicate<String, String> filter;
         if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
         else filter = null;
-        myApp.query(new ScanQuery<>(filter)).forEach(entry -> {
-            data.put(entry.getKey(),entry.getValue());
-        });
+        myApp.query(new ScanQuery<>(filter)).forEach(entry -> data.put(entry.getKey(), entry.getValue()));
         return data;
     }
 
@@ -104,9 +104,7 @@ public class DataService implements DataInterface {
         IgniteBiPredicate<String, TimedMetric> filter;
         if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
         else filter = null;
-        myAnalytics.query(new ScanQuery<>(filter)).forEach(entry -> {
-            data.put(entry.getKey(),"\"val\": " + entry.getValue().val + " , \"timestamp\": " + entry.getValue().timestamp);
-        });
+        myAnalytics.query(new ScanQuery<>(filter)).forEach(entry -> data.put(entry.getKey(), "\"val\": " + entry.getValue().val + " , \"timestamp\": " + entry.getValue().timestamp));
         return data;
     }
 
@@ -125,9 +123,7 @@ public class DataService implements DataInterface {
         IgniteBiPredicate<String, TimedMetric> filter;
         if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
         else filter = null;
-        myLatest.query(new ScanQuery<>(filter)).forEach(entry -> {
-            data.put(entry.getKey(), "\"val\": " + entry.getValue().val + " , \"timestamp\": " + entry.getValue().timestamp);
-        });
+        myLatest.query(new ScanQuery<>(filter)).forEach(entry -> data.put(entry.getKey(), "\"val\": " + entry.getValue().val + " , \"timestamp\": " + entry.getValue().timestamp));
         return data;
     }
 
@@ -141,8 +137,7 @@ public class DataService implements DataInterface {
                 res.add(" { \"timestamp\": " + time + " , \"val\": " + value + " } ");
             }
         }
-        String result = "\"values\": [ " + String.join(", ", res) + " ] ";
-        return result;
+        return "\"values\": [ " + String.join(", ", res) + " ] ";
     }
 
     private HashMap<String, String> extractMeta(HashSet<String> search) {
@@ -190,7 +185,6 @@ public class DataService implements DataInterface {
     }
 
     //------------API----------------
-
     private class CustomHttpServer extends AbstractHttpServer {
 
         private final byte[] URI_PUT = "/put".getBytes();
@@ -243,6 +237,7 @@ public class DataService implements DataInterface {
                         try {
                             boolean entityFlag = false;
                             HashSet<String> ids = new HashSet<>();
+                            long from = -1, to = -1;
                             if (obj.has("entityID")) {
                                 JSONArray entities = obj.getJSONArray("entityID");
                                 List<String> entitiesList = entities.toList().stream().map(Object::toString).collect(Collectors.toList());
@@ -250,17 +245,26 @@ public class DataService implements DataInterface {
                                 entityFlag = true;
                             } else if (obj.has("metricID")) {
                                 JSONArray entities = obj.getJSONArray("metricID");
-                                for (Object ent : entities) { //Store metric ids to list
-                                    ids.add(ent.toString());
-                                }
+                                List<String> entitiesList = entities.toList().stream().map(Object::toString).collect(Collectors.toList());
+                                ids.addAll(entitiesList);
                             }
-                                if (obj.has("latest") && obj.getBoolean("latest")) { //Get only the latest data
-                                    result = extractMonitoring(ids, entityFlag);
-                                } else if (obj.has("from") && obj.has("to")) {
-                                    long from = obj.getLong("from");
-                                    long to = obj.getLong("to");
-                                    result = extractMonitoring(ids, entityFlag, from, to);
+                            if (obj.has("from") && obj.has("to") && obj.getLong("from") >= 0 && obj.getLong("to") >= obj.getLong("from")) {
+                                from = obj.getLong("from");
+                                to = obj.getLong("to");
+                            }
+                            if(obj.has("nodes")){ //Get data from the cluster
+                                //TODO Make this take list of nodes
+                                ClusterGroup servers = ignite.cluster().forServers();
+                                for (ClusterNode server : servers.nodes()){
+                                    DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
+                                            DataInterface.class, false);
+                                    HashMap<String,String> nodeData = (from > -1) ? extractionInterface.extractMonitoring(ids, entityFlag, from, to) : extractionInterface.extractMonitoring(ids, entityFlag);
+                                    if(!nodeData.isEmpty())
+                                        result.put(server.id().toString(), "{\"node\": \"" + server.id().toString() + "\", \"data\": [ " + String.join(", ", nodeData.values()) + " ]} ");
                                 }
+                            }else{ //Get local data
+                                result = (from > -1) ?  extractMonitoring(ids, entityFlag, from, to) : extractMonitoring(ids, entityFlag);
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
@@ -280,7 +284,7 @@ public class DataService implements DataInterface {
                         JSONArray analytics = obj.getJSONArray("analytics");
                         for (int i = 0; i < analytics.length(); i++) {
                             JSONObject o = analytics.getJSONObject(i);
-                            if(o.has("key") && o.has("val") && o.has("timestamp")){
+                            if (o.has("key") && o.has("val") && o.has("timestamp")) {
                                 data.put(o.getString("key"), new TimedMetric(o.getDouble("val"), o.getLong("timestamp")));
                             }
                         }
@@ -292,7 +296,7 @@ public class DataService implements DataInterface {
                     }
                 }
                 //GET analytics data
-                else if (matches(buf, req.path, URI_ANALYTICS_GET)) {
+                else if (matches(buf, req.path, URI_ANALYTICS_GET)) { //TODO get data from list of server nodes (like monitoring)
                     HashMap<String, String> result = new HashMap<>();
                     //Read and parse json
                     String body = buf.get(req.body);
@@ -319,7 +323,7 @@ public class DataService implements DataInterface {
                     return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
                 }
                 //PUT application data
-                else if (myApp != null && matches(buf, req.path, URI_APP_PUT)){
+                else if (myApp != null && matches(buf, req.path, URI_APP_PUT)) {
                     //Data structure for app data
                     HashMap<String, String> data = new HashMap<>();
                     //Read and parse json
@@ -330,7 +334,7 @@ public class DataService implements DataInterface {
                         JSONArray application = obj.getJSONArray("application");
                         for (int i = 0; i < application.length(); i++) {
                             JSONObject o = application.getJSONObject(i);
-                            if(o.has("key") && o.has("value")){
+                            if (o.has("key") && o.has("value")) {
                                 data.put(o.getString("key"), o.getString("value"));
                             }
                         }
@@ -374,14 +378,13 @@ public class DataService implements DataInterface {
     }
 
     //-----------PUBLIC FUNCTIONS--------------
-
     @Override
     //Extract latest
     public HashMap<String, String> extractMonitoring(Set<String> ids, boolean entity) {
-        HashMap<String,String> metaValues = new HashMap<>();
+        HashMap<String, String> metaValues = new HashMap<>();
         HashSet<String> metrics = new HashSet<>();
-        if(ids.isEmpty()) metrics.addAll(getMetricID());
-        else if(!entity) metrics.addAll(ids);
+        if (ids.isEmpty()) metrics.addAll(getMetricID());
+        else if (!entity) metrics.addAll(ids);
         else metrics.addAll(getMetricID(new ArrayList<>(ids)));
         if (!metrics.isEmpty()) {
             HashMap<String, String> values = extractLatestData(metrics);
@@ -396,15 +399,15 @@ public class DataService implements DataInterface {
     @Override
     //Extract historical
     public HashMap<String, String> extractMonitoring(Set<String> ids, boolean entity, Long from, Long to) {
-        HashMap<String,String> metaValues = new HashMap<>();
+        HashMap<String, String> metaValues = new HashMap<>();
         HashSet<String> metrics = new HashSet<>();
-        if(ids.isEmpty()) metrics.addAll(getMetricID());
-        else if(!entity) metrics.addAll(ids);
+        if (ids.isEmpty()) metrics.addAll(getMetricID());
+        else if (!entity) metrics.addAll(ids);
         else metrics.addAll(getMetricID(new ArrayList<>(ids)));
         if (!metrics.isEmpty()) {
             HashMap<String, String> values = new HashMap<>();
-            for (String id : metrics){
-                values.put(id,extractHistoricalData(id, from, to));
+            for (String id : metrics) {
+                values.put(id, extractHistoricalData(id, from, to));
             }
             HashMap<String, String> meta = extractMeta(metrics);
 
