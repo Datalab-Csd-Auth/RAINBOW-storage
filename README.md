@@ -37,9 +37,18 @@ Ignite uses caches for both persistent and in-memory data. Ignite-server uses 3 
 - *MetaMonitoring* cache is used for persistent storage of metadata for every monitoring metric and the entity they belong to.
 - *Analytics* cache is used for in-memory storage of processed data from the Analytics component.
 
-For the user application data 1 in-memory key-value cache is used, namely **ApplicationData**.
+For the user application data 1 in-memory key-value cache is used, namely *ApplicationData*.
 
 With persistence enabled the cluster takes longer to initiate each new node and insert it into the baseline topology (auto-adjustment is on).
+
+### Data Regions
+
+2 data regions are available with specified off-heap memory limits. 
+
+- *Persistent_region*: is used for the persistent caches (*HistoricalMonitoring* and *MetaMonitoring*) with default max off-heap memory size to 256MB.
+- *Default_region*: is the region for every in-memory cache with default max off-heap memory size to 256MB.
+
+The default total size of the regions is 512MB split evenly between them (256MB for persistent region and 256MB for in-memory). The user can optionally change the total memory size with the **SIZE** environment variable. *The minimum off-heap size for each region is 100MB.*
 
 ## Deployment
 
@@ -55,9 +64,11 @@ Environment variables control the optional features such as persistence and the 
 
 1. **NODE**: The variable that controls the instance type. Available values are "**SERVER**" and "**CLIENT**". *Default value is "**SERVER**"*.
 2. **HOSTNAME**: The variable that is used for the container's hostname. If it is skipped, the program tries to find its own hostname using the `InetAddress` library.
-2. **DISCOVERY**: The variable that controls the discovery process. It should be a comma separated list of hostnames, e.g "**server-1,server-2**".
+3. **DISCOVERY**: The variable that controls the discovery process. It should be a comma separated list of hostnames, e.g "**server-1,server-2**".
 4. **APP_CACHE**: The variable that controls whether the user-application cache is on or off. Available values are "**true**" and "**false**". *Default value is "**false**"*.
 5. **EVICTION**: The variable that controls the eviction period for in-memory data. The value represents the eviction rate in hours from the creation of a data row. *Default value is "**168** hours (1 week)"*.
+6. **SIZE**: The variable that controls the total off-heap size for the data regions. Each region gets half of the total size as the maximum off-heap memory size.
+7. **JAVA_OPTS**: The variable that controls different JVM options. The user can change the max JVM heap memory size (e.g. "-Xms256m -Xmx256m"). 
 
 ## Docker ports
 
@@ -101,6 +112,18 @@ The available ports that are exposed from the Docker deployment through the abov
 ```
 The `from` and `to` variables are optional if the `latest` variable is true. The `metricID` can also be `entityID` to get all metrics from an entity or skipped entirely to get all available metrics.
 
+Using the optional `nodes` keyword with an array of ips (or empty array) returns the requested metric from a set of server nodes (or every active server node):
+```
+{   
+    "metricID": ["metr1"],
+    "from": 1611318068000, 
+    "to": 2611318068000, 
+    "latest": false,
+    "nodes": ["ip1","ip2"]
+}
+```
+
+
 * For the analytics data, a `/analytics/put` POST request needs to have a similar body:
 
 ```
@@ -122,6 +145,14 @@ The `from` and `to` variables are optional if the `latest` variable is true. The
 ```
 
 An empty body returns every stored key.
+
+Using the optional `nodes` keyword with an array of ips (or empty array) returns the requested metric from a set of server nodes (or every active server node):
+```
+{   
+    "key": ["app1"],
+    "nodes": ["ip1","ip2"]
+}
+```
 
 * For the user-application data, a `/app/put` POST request needs to have a similar body:
 
