@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.3] - 18-10-2021
+
+### Added
+
+- JVM options on dockerfiles for GC and heap memory. Optional user input for heap memory throught the JAVA_OPTS environment variable.
+- Added option for monitoring and analytics `get` commands to return data from a set (or all) server nodes based on their hostnames/ips.
+
+### Changed
+
+- Optional user input for regions total size. Default total size is 512MB which is split evenly between the in-memory and persistent regions.
+
 ## [1.3.2] - 11-10-2021
 
 ### Added
@@ -95,6 +106,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.3.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.3
 [1.3.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.2
 [1.3.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.1
 [1.3.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.0
