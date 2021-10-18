@@ -12,4 +12,6 @@ public interface DataInterface extends Service {
 
     HashMap<String, String> extractMonitoring(Set<String> ids, boolean entity, Long from, Long to);
 
+    HashMap<String, String> extractAnalytics(Set<String> ids);
+
 }

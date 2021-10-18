@@ -36,6 +36,7 @@ public class ServerNodeStartup {
     public static final String appCacheName = "ApplicationData";
     public static final String analyticsCacheName = "Analytics";
     private static int evictionHours = 168;
+    private static long totalSize = 512;
     private static final String defaultRegionName = "Default_Region";
     private static final String persistenceRegionName = "Persistent_Region";
     private static final String appRegionName = "App_Region";
@@ -51,8 +52,18 @@ public class ServerNodeStartup {
     private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
         //Set cluster identification and custom parameters
         //System.setProperty("java.net.preferIPv4Stack", "true"); //Only use ipv4
+        //Get eviction rate
+        String tmpEvict = readEnvVariable("EVICTION");
+        if (tmpEvict != null) evictionHours = Integer.parseInt(tmpEvict);
+        //Get total size of data regions
+        String tmpSize = readEnvVariable("SIZE");
+        if (tmpSize != null) totalSize = Long.parseLong(tmpSize);
+        //Split size between the 2 regions
+        long regionSize = Math.max(totalSize / 2, 100);
+        //Set attributes
         Map<String, Boolean> myAtrr = new HashMap<>();
         myAtrr.put("data.node", true);
+        //Create context
         IgniteConfiguration cfg = new IgniteConfiguration();
         cfg.setPeerClassLoadingEnabled(true);
         cfg.setUserAttributes(myAtrr);
@@ -66,8 +77,7 @@ public class ServerNodeStartup {
         DataRegionConfiguration defaultRegion = new DataRegionConfiguration();
         defaultRegion.setName(defaultRegionName);
         defaultRegion.setInitialSize(100 * 1024 * 1024);
-        //TODO make it a variable
-        defaultRegion.setMaxSize(512 * 1024 * 1024);
+        defaultRegion.setMaxSize(regionSize * 1024 * 1024);
         defaultRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
         defaultRegion.setMetricsEnabled(true);
         dsc.setDefaultDataRegionConfiguration(defaultRegion);
@@ -75,28 +85,14 @@ public class ServerNodeStartup {
         DataRegionConfiguration regionWithPersistence = new DataRegionConfiguration();
         regionWithPersistence.setName(persistenceRegionName);
         regionWithPersistence.setInitialSize(100 * 1024 * 1024);
-        //TODO make it a variable
-        regionWithPersistence.setMaxSize(512 * 1024 * 1024);
+        regionWithPersistence.setMaxSize(regionSize * 1024 * 1024);
         regionWithPersistence.setPersistenceEnabled(true);
         regionWithPersistence.setMetricsEnabled(true);
         dsc.setDataRegionConfigurations(regionWithPersistence);
-        //App-cache region
-        if (app_cache) {
-            DataRegionConfiguration appRegion = new DataRegionConfiguration();
-            appRegion.setName(appRegionName);
-            appRegion.setInitialSize(100 * 1024 * 1024);
-            //TODO make it a variable
-            appRegion.setMaxSize(256 * 1024 * 1024);
-            appRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
-            appRegion.setMetricsEnabled(true);
-            dsc.setDataRegionConfigurations(appRegion);
-        }
+        //Add to context
         cfg.setDataStorageConfiguration(dsc);
 
         //Cache configurations
-        //Get eviction rate
-        String evict = readEnvVariable("EVICTION");
-        if (evict != null) evictionHours = Integer.parseInt(Objects.requireNonNull(readEnvVariable("EVICTION")));
         //Latest monitoring data cache
         CacheConfiguration<String, TimedMetric> latestCfg = new CacheConfiguration<>(latestCacheName);
         latestCfg.setCacheMode(CacheMode.LOCAL)
@@ -122,7 +118,6 @@ public class ServerNodeStartup {
                             .setCacheMode(CacheMode.LOCAL)
                             .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                             .setEagerTtl(true)
-                            .setDataRegionName(appRegionName)
             );
         } else {
             cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);

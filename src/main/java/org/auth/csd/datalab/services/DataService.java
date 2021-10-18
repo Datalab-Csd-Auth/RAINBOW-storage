@@ -28,6 +28,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.auth.csd.datalab.ServerNodeStartup.*;
+import static org.auth.csd.datalab.common.Helpers.getNodesByHostnames;
 
 public class DataService implements DataInterface {
 
@@ -99,7 +100,7 @@ public class DataService implements DataInterface {
         }
     }
 
-    private HashMap<String, String> extractAnalyticsData(List<String> search) {
+    private HashMap<String, String> extractAnalyticsData(Set<String> search) {
         HashMap<String, String> data = new HashMap<>();
         IgniteBiPredicate<String, TimedMetric> filter;
         if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
@@ -253,14 +254,15 @@ public class DataService implements DataInterface {
                                 to = obj.getLong("to");
                             }
                             if(obj.has("nodes")){ //Get data from the cluster
-                                //TODO Make this take list of nodes
-                                ClusterGroup servers = ignite.cluster().forServers();
+                                JSONArray nodes = obj.getJSONArray("nodes");
+                                HashSet<String> nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
+                                ClusterGroup servers = (nodesList.isEmpty()) ? ignite.cluster().forServers() : ignite.cluster().forServers().forPredicate(getNodesByHostnames(nodesList));
                                 for (ClusterNode server : servers.nodes()){
                                     DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
                                             DataInterface.class, false);
                                     HashMap<String,String> nodeData = (from > -1) ? extractionInterface.extractMonitoring(ids, entityFlag, from, to) : extractionInterface.extractMonitoring(ids, entityFlag);
                                     if(!nodeData.isEmpty())
-                                        result.put(server.id().toString(), "{\"node\": \"" + server.id().toString() + "\", \"data\": [ " + String.join(", ", nodeData.values()) + " ]} ");
+                                        result.put(server.id().toString(), "{\"node\": \"" + server.hostNames().toString() + "\", \"data\": [ " + String.join(", ", nodeData.values()) + " ]} ");
                                 }
                             }else{ //Get local data
                                 result = (from > -1) ?  extractMonitoring(ids, entityFlag, from, to) : extractMonitoring(ids, entityFlag);
@@ -296,30 +298,38 @@ public class DataService implements DataInterface {
                     }
                 }
                 //GET analytics data
-                else if (matches(buf, req.path, URI_ANALYTICS_GET)) { //TODO get data from list of server nodes (like monitoring)
+                else if (matches(buf, req.path, URI_ANALYTICS_GET)) {
                     HashMap<String, String> result = new HashMap<>();
                     //Read and parse json
                     String body = buf.get(req.body);
                     if (!body.equals("")) { //Check if body has filters
                         JSONObject obj = new JSONObject(body);
                         try {
-                            ArrayList<String> ids = new ArrayList<>();
+                            HashSet<String> ids = new HashSet<>();
                             if (obj.has("key")) {
                                 JSONArray tmpKeys = obj.getJSONArray("key");
                                 ids.addAll(tmpKeys.toList().stream().map(Object::toString).collect(Collectors.toList()));
                             }
-                            result = extractAnalyticsData(ids);
+                            if(obj.has("nodes")){ //Get data from the cluster
+                                JSONArray nodes = obj.getJSONArray("nodes");
+                                HashSet<String> nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
+                                ClusterGroup servers = (nodesList.isEmpty()) ? ignite.cluster().forServers() : ignite.cluster().forServers().forPredicate(getNodesByHostnames(nodesList));
+                                for (ClusterNode server : servers.nodes()){
+                                    DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
+                                            DataInterface.class, false);
+                                    HashMap<String,String> nodeData = extractionInterface.extractAnalytics(ids);
+                                    if(!nodeData.isEmpty())
+                                        result.put(server.id().toString(), "{\"node\": \"" + server.hostNames().toString() + "\", \"data\": [ " + String.join(", ", nodeData.values()) + " ]} ");
+                                }
+                            }else{ //Get local data
+                                result = extractAnalytics(ids);
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
                         }
                     }
-                    //Join meta with values
-                    List<String> metaValues = new ArrayList<>();
-                    for (String metric : result.keySet()) {
-                        metaValues.add(" { \"key\": \"" + metric + "\" , " + result.get(metric) + " } ");
-                    }
-                    String finalRes = "{\"analytics\": [ " + String.join(", ", metaValues) + " ]} ";
+                    String finalRes = "{\"analytics\": [ " + String.join(", ", result.values()) + " ]} ";
                     return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
                 }
                 //PUT application data
@@ -416,5 +426,13 @@ public class DataService implements DataInterface {
             }
         }
         return metaValues;
+    }
+
+    @Override
+    //Extract analytics
+    public HashMap<String, String> extractAnalytics(Set<String> ids) {
+        HashMap<String, String> result = extractAnalyticsData(ids);
+        result.replaceAll((k, v) -> "{ \"key\": \"" + k + "\", " + result.get(k) + " } ");
+        return result;
     }
 }

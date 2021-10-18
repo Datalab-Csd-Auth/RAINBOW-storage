@@ -8,8 +8,8 @@ services:
       NODE: SERVER
       DISCOVERY: "ipv6"
       HOSTNAME: "ipv6"
+      JAVA_OPTS: "-Xms256m -Xmx256m"
 #    volumes:
-#      - "/opt/ignite-log4j.xml:/opt/assets/ignite-log4j.xml"
 #      - ./data:/opt/assets/ignite
 #    deploy:
 #      restart_policy:
