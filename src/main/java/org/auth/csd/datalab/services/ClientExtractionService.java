@@ -32,14 +32,14 @@ public class ClientExtractionService implements ClientExtractionInterface {
     private Server server;
 
     /** {@inheritDoc} */
-    public void init(ServiceContext ctx) throws Exception {
+    public void init(ServiceContext ctx) {
         System.out.println("Initializing Extraction Service on client node:" + ignite.cluster().localNode());
         localNode = ignite.cluster().localNode().id();
         server = new CustomHttpServer().listen(50001);
     }
 
     /** {@inheritDoc} */
-    public void execute(ServiceContext ctx) throws Exception {
+    public void execute(ServiceContext ctx) {
         System.out.println("Executing Extraction Service on client node:" + ignite.cluster().localNode());
     }
 
@@ -50,7 +50,6 @@ public class ClientExtractionService implements ClientExtractionInterface {
     }
 
     //------------MONITORING----------------
-
     private HashMap<String, String> getData(HashSet<String> ids, boolean entity) {
         HashMap<String, String> metrics = new HashMap<>();
         ClusterGroup servers = ignite.cluster().forServers();
@@ -76,8 +75,8 @@ public class ClientExtractionService implements ClientExtractionInterface {
         }
         return metrics;
     }
-    //------------API----------------
 
+    //------------API----------------
     private class CustomHttpServer extends AbstractHttpServer {
 
         private final byte[] URI_GET = "/get".getBytes();
@@ -102,9 +101,8 @@ public class ClientExtractionService implements ClientExtractionInterface {
                                 entityFlag = true;
                             } else if (obj.has("metricID")) {
                                 JSONArray entities = obj.getJSONArray("metricID");
-                                for (Object ent : entities) { //Store metric ids to list
-                                    ids.add(ent.toString());
-                                }
+                                List<String> entitiesList = entities.toList().stream().map(Object::toString).collect(Collectors.toList());
+                                ids.addAll(entitiesList);
                             }
                             if (obj.has("latest") && obj.getBoolean("latest")) { //Get only the latest data
                                 result = getData(ids, entityFlag);
@@ -125,6 +123,5 @@ public class ClientExtractionService implements ClientExtractionInterface {
             return HttpStatus.NOT_FOUND;
         }
     }
-
 
 }
