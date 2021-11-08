@@ -4,11 +4,9 @@ import org.apache.ignite.*;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.*;
-import org.apache.ignite.logger.log4j.Log4JLogger;
 import org.apache.ignite.services.ServiceConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
-import org.apache.ignite.spi.metric.log.LogExporterSpi;
 import org.auth.csd.datalab.common.filter.DataFilter;
 import org.auth.csd.datalab.common.models.*;
 import org.auth.csd.datalab.services.DataService;
@@ -18,7 +16,6 @@ import javax.cache.expiry.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
@@ -39,7 +36,6 @@ public class ServerNodeStartup {
     private static long totalSize = 512;
     private static final String defaultRegionName = "Default_Region";
     private static final String persistenceRegionName = "Persistent_Region";
-    private static final String appRegionName = "App_Region";
 
     public static void createServer(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
@@ -94,19 +90,20 @@ public class ServerNodeStartup {
 
         //Cache configurations
         //Latest monitoring data cache
-        CacheConfiguration<String, TimedMetric> latestCfg = new CacheConfiguration<>(latestCacheName);
+        CacheConfiguration<MetricKey, TimedMetric> latestCfg = new CacheConfiguration<>(latestCacheName);
         latestCfg.setCacheMode(CacheMode.LOCAL)
+                .setIndexedTypes(MetricKey.class, TimedMetric.class)
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
         //Metadata cache (metric meta)
-        CacheConfiguration<MetaMetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
+        CacheConfiguration<MetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
         metaCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(MetaMetricKey.class, MetaMetric.class)
+                .setIndexedTypes(MetricKey.class, MetaMetric.class)
                 .setDataRegionName(persistenceRegionName);
         //Historical monitoring data cache
-        CacheConfiguration<MetricKey, Metric> historicalCfg = new CacheConfiguration<>(historicalCacheName);
+        CacheConfiguration<MetricTimeKey, Metric> historicalCfg = new CacheConfiguration<>(historicalCacheName);
         historicalCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(MetricKey.class, Metric.class)
+                .setIndexedTypes(MetricTimeKey.class, Metric.class)
                 .setDataRegionName(persistenceRegionName);
         //Analytics cache
         CacheConfiguration<String, TimedMetric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);

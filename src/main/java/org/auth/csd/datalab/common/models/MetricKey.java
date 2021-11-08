@@ -6,24 +6,24 @@ public class MetricKey {
 
     public MetricKey(InputJson tmp) {
         this.metricID = tmp.metricID;
-        this.timestamp = tmp.timestamp;
+        this.entityID = tmp.entityID;
     }
 
-    public MetricKey(String metricID, long timestamp) {
+    public MetricKey(String metricID, String entityID) {
         this.metricID = metricID;
-        this.timestamp = timestamp;
+        this.entityID = entityID;
     }
 
     @QuerySqlField(index = true)
     public String metricID;
-    @QuerySqlField(index = true, descending = true)
-    public long timestamp;
+    @QuerySqlField(index = true)
+    public String entityID;
 
     @Override
     public String toString() {
         return "{" +
                 " \"metricID\": \"" + metricID + "\"" +
-                ", \"timestamp\": " + timestamp +
+                ", \"entityID\": \"" + entityID + "\"" +
                 '}';
     }
 }

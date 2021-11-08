@@ -8,9 +8,9 @@ public interface DataInterface extends Service {
     /** Service name */
     public static final String SERVICE_NAME = "DataService";
 
-    HashMap<String, String> extractMonitoring(Set<String> ids, boolean entity);
+    ArrayList<String> extractMonitoring(HashMap<String, HashSet<String>> ids);
 
-    HashMap<String, String> extractMonitoring(Set<String> ids, boolean entity, Long from, Long to);
+    ArrayList<String> extractMonitoring(HashMap<String, HashSet<String>> ids, Long from, Long to);
 
     HashMap<String, String> extractAnalytics(Set<String> ids);
 

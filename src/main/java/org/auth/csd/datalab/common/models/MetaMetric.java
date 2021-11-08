@@ -13,6 +13,11 @@ public class MetaMetric {
         this.minVal = tmp.minVal;
         this.maxVal = tmp.maxVal;
         this.higherIsBetter = tmp.higherIsBetter;
+        this.podUUID = (tmp.pod != null) ? tmp.pod.uuid : "null";
+        this.podName = (tmp.pod != null) ? tmp.pod.name : "null";
+        this.podNamespace = (tmp.pod != null) ? tmp.pod.namespace: "null";
+        this.containerID = (tmp.container != null) ? tmp.container.id : "null";
+        this.containerName = (tmp.container != null) ? tmp.container.name : "null";
     }
 
     @QuerySqlField
@@ -31,11 +36,21 @@ public class MetaMetric {
     public double maxVal;
     @QuerySqlField
     public boolean higherIsBetter;
+    @QuerySqlField
+    public String podUUID;
+    @QuerySqlField
+    public String podName;
+    @QuerySqlField
+    public String podNamespace;
+    @QuerySqlField
+    public String containerID;
+    @QuerySqlField
+    public String containerName;
 
     @Override
     public String toString() {
         return "{" +
-                "\"entityType\": \"" + entityType + "\"" +
+                " \"entityType\": \"" + entityType + "\"" +
                 ", \"name\": \"" + name + "\"" +
                 ", \"units\": \"" + units + "\"" +
                 ", \"desc\": \"" + desc + "\"" +
@@ -43,6 +58,15 @@ public class MetaMetric {
                 ", \"minVal\": " + minVal +
                 ", \"maxVal\": " + maxVal +
                 ", \"higherIsBetter\": " + higherIsBetter +
-                '}';
+                ", \"pod\": {" +
+                    " \"uuid\": \"" + podUUID + "\"" +
+                    ", \"name\": \"" + podName + "\"" +
+                    ", \"namespace\": \"" + podNamespace + "\"" +
+                "}" +
+                ", \"container\": {" +
+                    " \"id\": \"" + containerID + "\"" +
+                    ", \"name\": \"" + containerName + "\"" +
+                "}" +
+                "}";
     }
 }

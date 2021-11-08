@@ -4,17 +4,13 @@ import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.configuration.IgniteConfiguration;
-import org.apache.ignite.services.ServiceConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
-import org.auth.csd.datalab.common.filter.ClientFilter;
-import org.auth.csd.datalab.services.ClientExtractionService;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.auth.csd.datalab.common.interfaces.ClientExtractionInterface.SERVICE_NAME;
 
 /**
  * A new Data Node will be started in a separate JVM process when this class gets executed.
@@ -38,19 +34,19 @@ public class ClientNodeStartup {
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
 
-        cfg.setServiceConfiguration(serviceConfiguration());
+//        cfg.setServiceConfiguration(serviceConfiguration());
 
         return cfg;
     }
 
-    private static ServiceConfiguration serviceConfiguration() {
-        // Gives back a Node Singleton Service
-        ServiceConfiguration cfg = new ServiceConfiguration();
-        cfg.setName(SERVICE_NAME);
-        cfg.setMaxPerNodeCount(1);
-        cfg.setNodeFilter(new ClientFilter());
-        cfg.setService(new ClientExtractionService());
-        return cfg;
-    }
+//    private static ServiceConfiguration serviceConfiguration() {
+//        // Gives back a Node Singleton Service
+//        ServiceConfiguration cfg = new ServiceConfiguration();
+//        cfg.setName(SERVICE_NAME);
+//        cfg.setMaxPerNodeCount(1);
+//        cfg.setNodeFilter(new ClientFilter());
+//        cfg.setService(new ClientExtractionService());
+//        return cfg;
+//    }
 
 }

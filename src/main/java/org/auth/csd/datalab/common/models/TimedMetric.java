@@ -1,13 +1,15 @@
 package org.auth.csd.datalab.common.models;
 
-public class TimedMetric {
+import org.apache.ignite.cache.query.annotations.QuerySqlField;
+
+public class TimedMetric extends Metric {
 
     public TimedMetric(Double val, Long timestamp) {
-        this.val = val;
+        super(val);
         this.timestamp = timestamp;
     }
 
-    public Double val;
+    @QuerySqlField
     public Long timestamp;
 
     @Override
