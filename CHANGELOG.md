@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.4] - 09-11-2021
+
+### Added
+
+- New fields in the metadata of the monitoring data about the pod and container info.
+- Added the unique combination of `metricID` and `entityID` as key to every stored cache of monitoring data.
+- New filters on `podName`, `podNamespace` and `containerName` based on the new metadata on the `get` request.
+
+### Changed
+
+- Changed the `metricID` and `entityID` filters on the `get` request for the monitoring data to be used alongside the new ones in any combination.
+
+### Removed
+
+- The `latest` field from the `get` request on the monitoring data. If no `from` and `to` fields are present then the latest data are returned.
+
 ## [1.3.3] - 18-10-2021
 
 ### Added
@@ -106,6 +122,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.3.4]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.4
 [1.3.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.3
 [1.3.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.2
 [1.3.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.1
