@@ -26,7 +26,7 @@ Client is responsible for extracting data from all/some remote nodes concurrentl
 
 It incorporates 1 service: 
 
-- Extraction service: which is responsible for extracting the queried data from every server instance via REST API with `/get` route. 
+- (*REMOVED* since the servers can do the same work for now) Extraction service: which is responsible for extracting the queried data from every server instance via REST API with `/get` route. 
 
 ## Caches
 
@@ -75,7 +75,7 @@ Environment variables control the optional features such as persistence and the 
 The available ports that are exposed from the Docker deployment through the above process are:
 
 - 50000: REST API for the Server instance
-- 50001: Extraction service for the Client instance
+- (*REMOVED*) 50001: Extraction service for the Client instance
 
 ## REST API examples
 
@@ -95,30 +95,47 @@ The available ports that are exposed from the Docker deployment through the abov
         "maxVal": 10,
         "higherIsBetter": true,
         "val": 6,
-        "timestamp": 1611318068003
+        "timestamp": 1611318068003,
+        "pod":{
+            "uuid": "123",
+            "name": "kube",
+            "namespace": "namespace"
+        },
+        "container":{
+            "id": "345",
+            "name": "container"
+        }
     }
 ]}
 ```
+
+The `entityID`, `metricID`, `val` and `timestamp` fields are mandatory.
 
 * For the monitoring data, a `/get` POST request needs to have a similar body:
 
 ```
 {   
     "metricID": ["metr1"],
+    "entityID": ["ent1"],
+    "podName": ["pod1"],
+    "podNamespace": ["name1"],
+    "containerName": ["container1"],
     "from": 1611318068000, 
-    "to": 2611318068000, 
-    "latest": false
+    "to": 2611318068000
 }
 ```
-The `from` and `to` variables are optional if the `latest` variable is true. The `metricID` can also be `entityID` to get all metrics from an entity or skipped entirely to get all available metrics.
+The `from` and `to` variables are optional. If they are missing only the latest value will be returned. The filters `metricID`, `entityID`, `podName`, `podNamespace` and `containerName` can be skipped or present in any combination for filtering out the results.
 
 Using the optional `nodes` keyword with an array of ips (or empty array) returns the requested metric from a set of server nodes (or every active server node):
 ```
 {   
     "metricID": ["metr1"],
+    "entityID": ["ent1"],
+    "podName": ["pod1"],
+    "podNamespace": ["name1"],
+    "containerName": ["container1"],
     "from": 1611318068000, 
-    "to": 2611318068000, 
-    "latest": false,
+    "to": 2611318068000
     "nodes": ["ip1","ip2"]
 }
 ```
@@ -135,6 +152,8 @@ Using the optional `nodes` keyword with an array of ips (or empty array) returns
     }
 ]}
 ```
+
+All 3 fields are mandatory.
 
 * For the user-application data, a `/analytics/get` POST request needs to have a similar body:
 
@@ -164,6 +183,8 @@ Using the optional `nodes` keyword with an array of ips (or empty array) returns
     }
 ]}
 ```
+
+Both fields are mandatory.
 
 * For the user-application data, a `/app/get` POST request needs to have a similar body:
 
