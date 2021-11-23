@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.5] - 23-11-2021
+
+### Added
+
+- Wildcards on filters for get queries
+
 ## [1.3.4] - 09-11-2021
 
 ### Added
@@ -122,6 +128,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.3.5]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.5
 [1.3.4]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.4
 [1.3.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.3
 [1.3.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.2
