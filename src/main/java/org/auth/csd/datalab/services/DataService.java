@@ -145,16 +145,23 @@ public class DataService implements DataInterface {
     private HashMap<MetricKey, String> extractMeta(HashMap<String, HashSet<String>> ids) {
         String select = " SELECT metricID, entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter, podUUID, podName, podNamespace, containerID, containerName ";
         String from = " FROM METAMETRIC ";
-        String where = "";
+        List<String> where = new ArrayList<>();
         HashMap<MetricKey, String> meta = new HashMap<>();
         if (!ids.isEmpty()) {
-            where += " WHERE ";
             for (Map.Entry<String, HashSet<String>> entry : ids.entrySet()) {
-                where += entry.getKey() + " IN ('" + String.join("','", entry.getValue()) + "') AND ";
+                List<String> tmpWhere = new ArrayList<>();
+                List<String> wildcard = entry.getValue().stream().filter(el -> el.endsWith("%")).collect(Collectors.toList());
+                List<String> exact = new ArrayList<>(entry.getValue());
+                exact.removeAll(wildcard);
+                if(!exact.isEmpty()) tmpWhere.add(entry.getKey() + " IN ('" + String.join("','", entry.getValue()) + "') ");
+                for (String key : wildcard){
+                    tmpWhere.add(entry.getKey() + " LIKE '" + key + "' ");
+                }
+                where.add("(" + String.join(") OR (", tmpWhere) + ")");
             }
-            where = where.substring(0, where.length() - 4);
         }
-        SqlFieldsQuery sql = new SqlFieldsQuery(select + from + where);
+        String finalWhere = (!where.isEmpty()) ? " WHERE (" + String.join(") AND (", where) + ") " : "";
+        SqlFieldsQuery sql = new SqlFieldsQuery(select + from + finalWhere);
         try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
             for (List<?> row : cursor) {
                 MetricKey myKey = new MetricKey(row.get(0).toString(), row.get(1).toString());
