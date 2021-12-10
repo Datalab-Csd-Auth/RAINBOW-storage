@@ -25,10 +25,8 @@ public class MetricTimeKey extends MetricKey {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"metricID\": \"" + metricID + "\"" +
+        return  "\"metricID\": \"" + metricID + "\"" +
                 ", \"entityID\": \"" + entityID + "\"" +
-                ", \"timestamp\": " + timestamp +
-                '}';
+                ", \"timestamp\": " + timestamp;
     }
 }

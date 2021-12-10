@@ -21,6 +21,22 @@ public class MetaMetric {
         this.containerName = (tmp.container != null) ? tmp.container.name : "null";
     }
 
+    public MetaMetric(String entityType, String name, String units, String desc, String groupName, double minVal, double maxVal, boolean higherIsBetter, String podUUID, String podName, String podNamespace, String containerID, String containerName) {
+        this.entityType = entityType;
+        this.name = name;
+        this.units = units;
+        this.desc = desc;
+        this.groupName = groupName;
+        this.minVal = minVal;
+        this.maxVal = maxVal;
+        this.higherIsBetter = higherIsBetter;
+        this.podUUID = podUUID;
+        this.podName = podName;
+        this.podNamespace = podNamespace;
+        this.containerID = containerID;
+        this.containerName = containerName;
+    }
+
     @QuerySqlField
     public String entityType;
     @QuerySqlField
@@ -50,8 +66,7 @@ public class MetaMetric {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"entityType\": \"" + entityType + "\"" +
+        return  "\"entityType\": \"" + entityType + "\"" +
                 ", \"name\": \"" + name + "\"" +
                 ", \"units\": \"" + units + "\"" +
                 ", \"desc\": \"" + desc + "\"" +
@@ -67,7 +82,6 @@ public class MetaMetric {
                 ", \"container\": {" +
                     " \"id\": \"" + containerID + "\"" +
                     ", \"name\": \"" + containerName + "\"" +
-                "}" +
                 "}";
     }
 }

@@ -22,9 +22,7 @@ public class MetricKey {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"metricID\": \"" + metricID + "\"" +
-                ", \"entityID\": \"" + entityID + "\"" +
-                '}';
+        return  "\"metricID\": \"" + metricID + "\"" +
+                ", \"entityID\": \"" + entityID + "\"";
     }
 }
