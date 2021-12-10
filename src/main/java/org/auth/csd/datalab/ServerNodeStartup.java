@@ -8,7 +8,12 @@ import org.apache.ignite.services.ServiceConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
-import org.auth.csd.datalab.common.models.*;
+import org.auth.csd.datalab.common.models.keys.AnalyticKey;
+import org.auth.csd.datalab.common.models.keys.MetricKey;
+import org.auth.csd.datalab.common.models.keys.MetricTimeKey;
+import org.auth.csd.datalab.common.models.values.MetaMetric;
+import org.auth.csd.datalab.common.models.values.Metric;
+import org.auth.csd.datalab.common.models.values.TimedMetric;
 import org.auth.csd.datalab.services.DataService;
 
 import javax.cache.expiry.CreatedExpiryPolicy;
@@ -106,8 +111,10 @@ public class ServerNodeStartup {
                 .setIndexedTypes(MetricTimeKey.class, Metric.class)
                 .setDataRegionName(persistenceRegionName);
         //Analytics cache
-        CacheConfiguration<String, TimedMetric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
-        analyticsCfg.setCacheMode(CacheMode.LOCAL);
+        CacheConfiguration<AnalyticKey, Metric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
+        analyticsCfg.setCacheMode(CacheMode.LOCAL)
+                .setIndexedTypes(AnalyticKey.class, Metric.class)
+                .setDataRegionName(persistenceRegionName);
         //Optional application k-v cache
         if (app_cache) {
             cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,

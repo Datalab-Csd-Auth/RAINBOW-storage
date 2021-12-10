@@ -1,6 +1,7 @@
-package org.auth.csd.datalab.common.models;
+package org.auth.csd.datalab.common.models.values;
 
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
+import org.auth.csd.datalab.common.models.InputJson;
 
 public class MetaMetric {
 

@@ -1,4 +1,4 @@
-package org.auth.csd.datalab.common.models;
+package org.auth.csd.datalab.common.models.values;
 
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
 
@@ -14,9 +14,7 @@ public class TimedMetric extends Metric {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"value\": \"" + val + "\"" +
-                ", \"timestamp\": \"" + timestamp + "\"" +
-                '}';
+        return "\"timestamp\": \"" + timestamp + "\"" +
+                ", \"val\": \"" + val + "\"";
     }
 }
