@@ -16,7 +16,7 @@ public class AnalyticKey {
 
     @Override
     public String toString() {
-        return  "\"key\": \"" + key + "\"" +
-                ", \"timestamp\": \"" + timestamp + "\"";
+        return  "\"key\": " + key +
+                ", \"timestamp\": " + timestamp;
     }
 }

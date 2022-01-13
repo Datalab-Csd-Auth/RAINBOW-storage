@@ -13,6 +13,7 @@ public interface DataInterface extends Service {
 
     HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter);
     HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to);
+    HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, String agg);
     String extractMonitoringJson(HashMap<String, HashSet<String>> filter);
     String extractMonitoringJson(HashMap<String, HashSet<String>> filter, Long from, Long to);
 

@@ -5,6 +5,7 @@ import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.*;
 import org.apache.ignite.services.ServiceConfiguration;
+import org.apache.ignite.spi.checkpoint.CheckpointSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
@@ -46,7 +47,7 @@ public class ServerNodeStartup {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
-        ignite.cluster().baselineAutoAdjustTimeout(10);
+        ignite.cluster().baselineAutoAdjustTimeout(60000);
         System.out.println(ignite.cluster().localNode().id());
     }
 
@@ -104,17 +105,23 @@ public class ServerNodeStartup {
         CacheConfiguration<MetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
         metaCfg.setCacheMode(CacheMode.LOCAL)
                 .setIndexedTypes(MetricKey.class, MetaMetric.class)
-                .setDataRegionName(persistenceRegionName);
+                .setDataRegionName(persistenceRegionName)
+                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                .setEagerTtl(true);
         //Historical monitoring data cache
         CacheConfiguration<MetricTimeKey, Metric> historicalCfg = new CacheConfiguration<>(historicalCacheName);
         historicalCfg.setCacheMode(CacheMode.LOCAL)
                 .setIndexedTypes(MetricTimeKey.class, Metric.class)
-                .setDataRegionName(persistenceRegionName);
+                .setDataRegionName(persistenceRegionName)
+                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                .setEagerTtl(true);
         //Analytics cache
         CacheConfiguration<AnalyticKey, Metric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
         analyticsCfg.setCacheMode(CacheMode.LOCAL)
                 .setIndexedTypes(AnalyticKey.class, Metric.class)
-                .setDataRegionName(persistenceRegionName);
+                .setDataRegionName(persistenceRegionName)
+                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                .setEagerTtl(true);
         //Optional application k-v cache
         if (app_cache) {
             cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,

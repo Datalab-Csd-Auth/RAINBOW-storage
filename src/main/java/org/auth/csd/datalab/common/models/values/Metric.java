@@ -13,6 +13,6 @@ public class Metric {
 
     @Override
     public String toString() {
-        return "\"val\": \"" + val + "\"";
+        return "\"val\": " + val;
     }
 }

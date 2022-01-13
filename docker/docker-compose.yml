@@ -2,7 +2,7 @@ version: "3.2"
 
 services:
   ignite-server:
-    image: rainbow-storage:1.3.5
+    image: registry.gitlab.com/rainbow-project1/rainbow-storage:latest
     network_mode: host
     environment:
       NODE: SERVER
@@ -10,5 +10,5 @@ services:
       HOSTNAME: "ipv6"
       JAVA_OPTS: "-Xms256m -Xmx256m" #Java heap size
       SIZE: "512" #Size for total off-heap storage (1/2 for persistence and 1/2 for in-memory caches)
-#    volumes:
-#      - ./data:/opt/assets/ignite
+    volumes:
+      - ./data:/opt/assets/ignite

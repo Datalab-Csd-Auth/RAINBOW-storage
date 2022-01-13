@@ -14,7 +14,7 @@ public class TimedMetric extends Metric {
 
     @Override
     public String toString() {
-        return "\"timestamp\": \"" + timestamp + "\"" +
-                ", \"val\": \"" + val + "\"";
+        return "\"timestamp\": " + timestamp +
+                ", \"val\": " + val;
     }
 }
