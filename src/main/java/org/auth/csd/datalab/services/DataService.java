@@ -31,8 +31,6 @@ import org.rapidoid.net.abstracts.Channel;
 import org.rapidoid.net.impl.RapidoidHelper;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.sql.Time;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -472,6 +470,12 @@ public class DataService implements DataInterface {
                                 filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
                             if (obj.has("containerName"))
                                 filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            //Get return fields
+                            HashSet<String> returns = new HashSet<>();
+                            if (obj.has("fields")) { //Get data from the cluster
+                                JSONArray nodes = obj.getJSONArray("fields");
+                                returns.addAll(nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new)));
+                            }
                             //Get server list
                             ClusterGroup servers = ignite.cluster().forServers();
                             //Get data from the cluster
@@ -482,7 +486,7 @@ public class DataService implements DataInterface {
                                 metricData.putAll(extractionInterface.extractMeta(filters));
                             }
                             if(!metricData.isEmpty()) {
-                                metricData.forEach((k, v) -> result.append("{").append(k).append(",").append(v).append("},"));
+                                metricData.forEach((k, v) -> result.append("{").append(k).append(",").append((returns.isEmpty()) ? v : v.toString(returns)).append("},"));
                                 result.deleteCharAt(result.length() - 1);
                             }
                         } catch (Exception e) {
