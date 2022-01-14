@@ -278,8 +278,10 @@ public class DataService implements DataInterface {
     //------------API----------------
     private class CustomHttpServer extends AbstractHttpServer {
 
+        //Monitoring
         private final byte[] URI_PUT = "/put".getBytes();
         private final byte[] URI_GET = "/get".getBytes();
+        private final byte[] URI_LIST = "/list".getBytes();
         //Analytics cache
         private final byte[] URI_ANALYTICS_PUT = "/analytics/put".getBytes();
         private final byte[] URI_ANALYTICS_GET = "/analytics/get".getBytes();
@@ -391,11 +393,13 @@ public class DataService implements DataInterface {
                                                                 break;
                                                             }
                                                             case "max": {
-                                                                if (newVal > oldVal) res.get(key).values.get(0).val = newVal;
+                                                                if (newVal > oldVal)
+                                                                    res.get(key).values.get(0).val = newVal;
                                                                 break;
                                                             }
                                                             case "min": {
-                                                                if (newVal < oldVal) res.get(key).values.get(0).val = newVal;
+                                                                if (newVal < oldVal)
+                                                                    res.get(key).values.get(0).val = newVal;
                                                                 break;
                                                             }
                                                             case "avg": {
@@ -404,13 +408,12 @@ public class DataService implements DataInterface {
                                                                 break;
                                                             }
                                                         }
-                                                    }
-                                                    else res.put(key, data.get(key));
+                                                    } else res.put(key, data.get(key));
                                                 }
                                             }
                                         }
                                     }
-                                    if(res != null) {
+                                    if (res != null) {
                                         for (MetricKey key : res.keySet()) {
                                             if (aggreg.equals("avg")) {
                                                 Monitoring oldMon = res.get(key);
@@ -440,6 +443,47 @@ public class DataService implements DataInterface {
                                     if (from > -1) result.append(extractMonitoringJson(filters, from, to));
                                     else result.append(extractMonitoringJson(filters));
                                 }
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                        }
+                    }
+                    result.append("]}");
+                    return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
+                }
+                //get LIST of monitoring metrics
+                else if (matches(buf, req.path, URI_LIST)) {
+                    StringBuilder result = new StringBuilder("{\"metric\": [");
+                    //Read and parse json
+                    String body = buf.get(req.body);
+                    if (!body.equals("")) { //Check if body has filters
+                        JSONObject obj = new JSONObject(body);
+                        try {
+                            //Get filters
+                            HashMap<String, HashSet<String>> filters = new HashMap<>();
+                            if (obj.has("metricID"))
+                                filters.put("metricID", new HashSet<>(obj.getJSONArray("metricID").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("entityID"))
+                                filters.put("entityID", new HashSet<>(obj.getJSONArray("entityID").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("podName"))
+                                filters.put("podName", new HashSet<>(obj.getJSONArray("podName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("podNamespace"))
+                                filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("containerName"))
+                                filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            //Get server list
+                            ClusterGroup servers = ignite.cluster().forServers();
+                            //Get data from the cluster
+                            HashMap<MetricKey, MetaMetric> metricData = new HashMap<>();
+                            for (ClusterNode server : servers.nodes()) {
+                                DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
+                                        DataInterface.class, false);
+                                metricData.putAll(extractionInterface.extractMeta(filters));
+                            }
+                            if(!metricData.isEmpty()) {
+                                metricData.forEach((k, v) -> result.append("{").append(k).append(",").append(v).append("},"));
+                                result.deleteCharAt(result.length() - 1);
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -555,6 +599,13 @@ public class DataService implements DataInterface {
     }
 
     //-----------PUBLIC FUNCTIONS--------------
+
+    @Override
+    //Extract only meta data
+    public HashMap<MetricKey, MetaMetric> extractMeta(HashMap<String, HashSet<String>> filter) {
+        return extractMetaData(filter);
+    }
+
     @Override
     //Extract latest monitoring data
     public HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter) {

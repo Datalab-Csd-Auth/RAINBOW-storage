@@ -5,7 +5,6 @@ import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.*;
 import org.apache.ignite.services.ServiceConfiguration;
-import org.apache.ignite.spi.checkpoint.CheckpointSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
