@@ -14,6 +14,12 @@ import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
 import org.auth.csd.datalab.common.models.*;
 import org.auth.csd.datalab.common.interfaces.DataInterface;
+import org.auth.csd.datalab.common.models.keys.AnalyticKey;
+import org.auth.csd.datalab.common.models.keys.MetricKey;
+import org.auth.csd.datalab.common.models.keys.MetricTimeKey;
+import org.auth.csd.datalab.common.models.values.MetaMetric;
+import org.auth.csd.datalab.common.models.values.Metric;
+import org.auth.csd.datalab.common.models.values.TimedMetric;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.rapidoid.buffer.Buf;
@@ -41,8 +47,16 @@ public class DataService implements DataInterface {
     private IgniteCache<MetricKey, TimedMetric> myLatest;
     private IgniteCache<MetricTimeKey, Metric> myHistorical;
     private IgniteCache<MetricKey, MetaMetric> myMeta;
-    private IgniteCache<String, TimedMetric> myAnalytics;
+    private IgniteCache<AnalyticKey, Metric> myAnalytics;
     private IgniteCache<String, String> myApp = null;
+    private ArrayList<String> aggregations = new ArrayList<String>() {
+        {
+            add("max");
+            add("min");
+            add("sum");
+            add("avg");
+        }
+    };
 
     UUID localNode = null;
     private String delimiter = ".";
@@ -78,6 +92,12 @@ public class DataService implements DataInterface {
         server.shutdown();
     }
 
+    //------------Common----------------
+    private FieldsQueryCursor<List<?>> getQueryValues(IgniteCache cache, String sql) {
+        SqlFieldsQuery query = new SqlFieldsQuery(sql);
+        return cache.query(query);
+    }
+
     //------------APP cache----------------
     private void ingestAppData(HashMap<String, String> data) {
         for (Map.Entry<String, String> entry : data.entrySet()) {
@@ -95,19 +115,46 @@ public class DataService implements DataInterface {
     }
 
     //------------ANALYTICS----------------
-    private void ingestAnalytics(HashMap<String, TimedMetric> data) {
-        for (Map.Entry<String, TimedMetric> entry : data.entrySet()) {
+    private void ingestAnalytics(HashMap<AnalyticKey, Metric> data) {
+        for (Map.Entry<AnalyticKey, Metric> entry : data.entrySet()) {
             myAnalytics.put(entry.getKey(), entry.getValue());
         }
     }
 
-    private HashMap<String, String> extractAnalyticsData(Set<String> search) {
-        HashMap<String, String> data = new HashMap<>();
-        IgniteBiPredicate<String, TimedMetric> filter;
-        if (!search.isEmpty()) filter = (key, val) -> search.contains(key);
-        else filter = null;
-        myAnalytics.query(new ScanQuery<>(filter)).forEach(entry -> data.put(entry.getKey(), "\"val\": " + entry.getValue().val + " , \"timestamp\": " + entry.getValue().timestamp));
-        return data;
+    private String beautifyAnalytics(String key, List<TimedMetric> values) {
+        StringBuilder result = new StringBuilder("{\"key\": \"" + key + "\",");
+        result.append("\"values\": [");
+        if (!values.isEmpty()) {
+            values.forEach(v -> result.append("{").append(v).append("},"));
+            result.deleteCharAt(result.length() - 1);
+        }
+        result.append("]}");
+        return result.toString();
+    }
+
+    private List<TimedMetric> extractAnalyticsData(String key) {
+        List<TimedMetric> result = new ArrayList<>();
+        String sql = "SELECT a.* " +
+                "FROM METRIC AS a " +
+                "INNER JOIN (SELECT key, MAX(timestamp) as timestamp FROM METRIC GROUP BY key) AS b ON a.key = b.key AND a.timestamp = b.timestamp " +
+                "WHERE a.key = '" + key + "'";
+        // Iterate over the result set.
+        try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
+            for (List<?> row : cursor)
+                result.add(new TimedMetric((Double) row.get(2), (long) row.get(1)));
+        }
+        return result;
+    }
+
+    private List<TimedMetric> extractAnalyticsData(String key, long from, long to) {
+        List<TimedMetric> result = new ArrayList<>();
+        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp BETWEEN " + from + " AND " + to + " AND key = '" + key + "'";
+        // Iterate over the result set.
+        try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
+            for (List<?> row : cursor)
+                result.add(new TimedMetric((Double) row.get(2), (long) row.get(1)));
+        }
+        return result;
     }
 
     //------------MONITORING----------------
@@ -119,102 +166,120 @@ public class DataService implements DataInterface {
         }
     }
 
-    private String extractLatestData(MetricKey myKey) {
-        List<String> res = new ArrayList<>();
-        SqlFieldsQuery sql = new SqlFieldsQuery("SELECT timestamp, val FROM TIMEDMETRIC WHERE metricID = '" + myKey.metricID + "' AND entityID = '" + myKey.entityID + "'");
-        return getString(res, myLatest.query(sql));
+    private String beautifyMonitoring(MetricKey key, MetaMetric metadata, List<TimedMetric> values) {
+        StringBuilder result = new StringBuilder("{" + key + ",");
+        result.append("\"values\": [");
+        if (!values.isEmpty()) {
+            values.forEach(v -> result.append("{").append(v).append("},"));
+            result.deleteCharAt(result.length() - 1);
+        }
+        result.append("],").append(metadata).append("}");
+        return result.toString();
     }
 
-    private String extractHistoricalData(MetricKey myKey, Long min, Long max) {
-        List<String> res = new ArrayList<>();
-        SqlFieldsQuery sql = new SqlFieldsQuery("SELECT timestamp, val FROM METRIC WHERE metricID = '" + myKey.metricID + "' AND entityID = '" + myKey.entityID + "' AND timestamp >= " + min + " AND timestamp <= " + max);
-        return getString(res, myHistorical.query(sql));
-    }
-
-    private String getString(List<String> res, FieldsQueryCursor<List<?>> query) {
-        try (QueryCursor<List<?>> cursor = query) {
-            for (List<?> row : cursor) {
-                Long time = (Long) row.get(0);
-                Double value = (Double) row.get(1);
-                res.add(" { \"timestamp\": " + time + " , \"val\": " + value + " } ");
+    private List<TimedMetric> extractMonitoringData(MetricKey key) {
+        List<TimedMetric> result = new ArrayList<>();
+        String sql = "SELECT timestamp, val FROM TIMEDMETRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "'";
+        // Iterate over the result set.
+        try (QueryCursor<List<?>> cursor = getQueryValues(myLatest, sql)) {
+            for (List<?> row : cursor)
+                result.add(new TimedMetric((Double) row.get(1), (long) row.get(0)));
+        }
+        //If main memory cache is empty (due to restart)
+        if (result.isEmpty()) {
+            sql = "SELECT a.timestamp, a.val " +
+                    "FROM METRIC AS a " +
+                    "INNER JOIN (SELECT metricID, entityID, MAX(timestamp) as timestamp FROM METRIC GROUP BY (metricID, entityID)) AS b ON a.metricID = b.metricID AND a.timestamp = b.timestamp AND a.entityID = b.entityID " +
+                    "WHERE a.metricID = '" + key.metricID + "' AND a.entityID = '" + key.entityID + "'";
+            // Iterate over the result set.
+            try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
+                for (List<?> row : cursor)
+                    result.add(new TimedMetric((Double) row.get(1), (long) row.get(0)));
             }
         }
-        return " \"values\": [ " + String.join(", ", res) + " ] ";
+        return result;
     }
 
-    private HashMap<MetricKey, String> extractMeta(HashMap<String, HashSet<String>> ids) {
-        String select = " SELECT metricID, entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter, podUUID, podName, podNamespace, containerID, containerName ";
-        String from = " FROM METAMETRIC ";
+    private List<TimedMetric> extractMonitoringData(MetricKey key, long from, long to) {
+        List<TimedMetric> result = new ArrayList<>();
+        String sql = "SELECT timestamp, val FROM METRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' AND timestamp BETWEEN " + from + " AND " + to;
+        // Iterate over the result set.
+        try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
+            for (List<?> row : cursor)
+                result.add(new TimedMetric((Double) row.get(1), (long) row.get(0)));
+        }
+        return result;
+    }
+
+    private List<TimedMetric> extractMonitoringData(MetricKey key, long from, long to, String agg) {
+        List<TimedMetric> result = new ArrayList<>();
+        String select = "SELECT ";
+        switch (agg) {
+            case "min":
+                select += "MIN(val) ";
+                break;
+            case "max":
+                select += "MAX(val) ";
+                break;
+            case "sum":
+                select += "SUM(val) ";
+                break;
+            case "avg":
+                select += "SUM(val), COUNT(val) ";
+                break;
+        }
+        String rest = "FROM METRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' AND timestamp BETWEEN " + from + " AND " + to;
+        // Iterate over the result set.
+        try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, select + rest)) {
+            for (List<?> row : cursor)
+                if (agg.equals("avg"))
+                    result.add(new TimedMetric((Double) row.get(0), (long) row.get(1)));
+                else
+                    result.add(new TimedMetric((Double) row.get(0), null));
+        }
+        return result;
+    }
+
+    private HashMap<MetricKey, MetaMetric> extractMetaData(HashMap<String, HashSet<String>> ids) {
+        String select = "SELECT metricID, entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter, podUUID, podName, podNamespace, containerID, containerName ";
+        String from = "FROM METAMETRIC ";
         List<String> where = new ArrayList<>();
-        HashMap<MetricKey, String> meta = new HashMap<>();
+        HashMap<MetricKey, MetaMetric> result = new HashMap<>();
         if (!ids.isEmpty()) {
             for (Map.Entry<String, HashSet<String>> entry : ids.entrySet()) {
                 List<String> tmpWhere = new ArrayList<>();
                 List<String> wildcard = entry.getValue().stream().filter(el -> el.endsWith("%")).collect(Collectors.toList());
                 List<String> exact = new ArrayList<>(entry.getValue());
                 exact.removeAll(wildcard);
-                if(!exact.isEmpty()) tmpWhere.add(entry.getKey() + " IN ('" + String.join("','", entry.getValue()) + "') ");
-                for (String key : wildcard){
+                if (!exact.isEmpty())
+                    tmpWhere.add(entry.getKey() + " IN ('" + String.join("','", entry.getValue()) + "') ");
+                for (String key : wildcard) {
                     tmpWhere.add(entry.getKey() + " LIKE '" + key + "' ");
                 }
                 where.add("(" + String.join(") OR (", tmpWhere) + ")");
             }
         }
         String finalWhere = (!where.isEmpty()) ? " WHERE (" + String.join(") AND (", where) + ") " : "";
-        SqlFieldsQuery sql = new SqlFieldsQuery(select + from + finalWhere);
-        try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
+        try (QueryCursor<List<?>> cursor = getQueryValues(myMeta, select + from + finalWhere)) {
             for (List<?> row : cursor) {
-                MetricKey myKey = new MetricKey(row.get(0).toString(), row.get(1).toString());
-                String res = " \"entityType\": \"" + row.get(2) + "\"" +
-                        ", \"name\": \"" + row.get(3) + "\"" +
-                        ", \"units\": \"" + row.get(4) + "\"" +
-                        ", \"desc\": \"" + row.get(5) + "\"" +
-                        ", \"group\": \"" + row.get(6) + "\"" +
-                        ", \"minVal\": " + row.get(7) +
-                        ", \"maxVal\": " + row.get(8) +
-                        ", \"higherIsBetter\": " + row.get(9) +
-                        ", \"pod\": {" +
-                        " \"uuid\": \"" + row.get(10) + "\"" +
-                        ", \"name\": \"" + row.get(11) + "\"" +
-                        ", \"namespace\": \"" + row.get(12) + "\"" +
-                        "}" +
-                        ", \"container\": {" +
-                        " \"id\": \"" + row.get(13) + "\"" +
-                        ", \"name\": \"" + row.get(14) + "\"" +
-                        "} ";
-                meta.put(myKey, res);
+                MetricKey key = new MetricKey(row.get(0).toString(), row.get(1).toString());
+                MetaMetric value = new MetaMetric(row.get(2).toString(), row.get(3).toString(), row.get(4).toString(), row.get(5).toString(),
+                        row.get(6).toString(), (double) row.get(7), (double) row.get(8), (boolean) row.get(9),
+                        row.get(10).toString(), row.get(11).toString(), row.get(12).toString(), row.get(13).toString(),
+                        row.get(14).toString());
+                result.put(key, value);
             }
         }
-        return meta;
-    }
-
-    private HashSet<String> getMetricID() {
-        HashSet<String> metrics = new HashSet<>();
-        SqlFieldsQuery sql = new SqlFieldsQuery("select metricID from METAMETRIC");
-        try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
-            for (List<?> row : cursor)
-                metrics.add(row.get(0).toString());
-        }
-        return metrics;
-    }
-
-    private HashSet<String> getMetricID(List<String> entities) {
-        HashSet<String> metrics = new HashSet<>();
-        for (String entity : entities) {
-            SqlFieldsQuery sql = new SqlFieldsQuery("select metricID from METAMETRIC WHERE entityID = '" + entity + "'");
-            try (QueryCursor<List<?>> cursor = myMeta.query(sql)) {
-                for (List<?> row : cursor)
-                    metrics.add(row.get(0).toString());
-            }
-        }
-        return metrics;
+        return result;
     }
 
     //------------API----------------
     private class CustomHttpServer extends AbstractHttpServer {
 
+        //Monitoring
         private final byte[] URI_PUT = "/put".getBytes();
         private final byte[] URI_GET = "/get".getBytes();
+        private final byte[] URI_LIST = "/list".getBytes();
         //Analytics cache
         private final byte[] URI_ANALYTICS_PUT = "/analytics/put".getBytes();
         private final byte[] URI_ANALYTICS_GET = "/analytics/get".getBytes();
@@ -255,7 +320,7 @@ public class DataService implements DataInterface {
                 }
                 //GET monitoring data
                 else if (matches(buf, req.path, URI_GET)) {
-                    ArrayList<String> result = new ArrayList<>();
+                    StringBuilder result = new StringBuilder("{\"monitoring\": [");
                     //Read and parse json
                     String body = buf.get(req.body);
                     if (!body.equals("")) { //Check if body has filters
@@ -279,32 +344,162 @@ public class DataService implements DataInterface {
                                 filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
                             if (obj.has("containerName"))
                                 filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
-
+                            //Get nodes
+                            ClusterGroup servers = null;
                             if (obj.has("nodes")) { //Get data from the cluster
                                 JSONArray nodes = obj.getJSONArray("nodes");
                                 HashSet<String> nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
-                                ClusterGroup servers = (nodesList.isEmpty()) ? ignite.cluster().forServers() : ignite.cluster().forServers().forPredicate(getNodesByHostnames(nodesList));
-                                for (ClusterNode server : servers.nodes()) {
-                                    DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
-                                            DataInterface.class, false);
-                                    ArrayList<String> nodeData = (from > -1) ? extractionInterface.extractMonitoring(filters, from, to) : extractionInterface.extractMonitoring(filters);
-                                    if (!nodeData.isEmpty())
-                                        result.add("{\"node\": \"" + server.hostNames().toString() + "\", \"data\": [ " + String.join(", ", nodeData) + " ]} ");
+                                servers = (nodesList.isEmpty()) ? ignite.cluster().forServers() : ignite.cluster().forServers().forPredicate(getNodesByHostnames(nodesList));
+                            }
+                            //Get aggregations
+                            if (obj.has("agg") && aggregations.contains(obj.getString("agg"))) {
+                                String aggreg = obj.getString("agg");
+                                //Get values and beautify
+                                if (servers == null) {
+                                    HashMap<MetricKey, Monitoring> data = extractMonitoring(filters, from, to, aggreg);
+                                    if (!data.isEmpty()) {
+                                        for (MetricKey key : data.keySet()) {
+                                            if (aggreg.equals("avg")) {
+                                                Monitoring oldMon = data.get(key);
+                                                double finalValue = oldMon.values.get(0).val / oldMon.values.get(0).timestamp;
+                                                List<TimedMetric> tmp = new ArrayList<>();
+                                                tmp.add(new TimedMetric(finalValue, null));
+                                                Monitoring newMon = new Monitoring(oldMon.metadata, tmp);
+                                                data.replace(key, newMon);
+                                            }
+                                            result.append(beautifyMonitoring(key, data.get(key).metadata, data.get(key).values)).append(",");
+                                        }
+                                        result.deleteCharAt(result.length() - 1);
+                                    }
+                                } else {
+                                    HashMap<MetricKey, Monitoring> res = null;
+                                    for (ClusterNode server : servers.nodes()) {
+                                        DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
+                                                DataInterface.class, false);
+                                        if (res == null) //If this is the first node checked
+                                            res = extractionInterface.extractMonitoring(filters, from, to, aggreg);
+                                        else { //If this is a node after the first one
+                                            HashMap<MetricKey, Monitoring> data = extractionInterface.extractMonitoring(filters, from, to, aggreg);
+                                            if (!data.isEmpty()) {
+                                                for (MetricKey key : data.keySet()) {
+                                                    if (res.containsKey(key)) {
+                                                        Double oldVal = res.get(key).values.get(0).val;
+                                                        Double newVal = data.get(key).values.get(0).val;
+                                                        switch (aggreg) {
+                                                            case "sum": {
+                                                                res.get(key).values.get(0).val += data.get(key).values.get(0).val;
+                                                                break;
+                                                            }
+                                                            case "max": {
+                                                                if (newVal > oldVal)
+                                                                    res.get(key).values.get(0).val = newVal;
+                                                                break;
+                                                            }
+                                                            case "min": {
+                                                                if (newVal < oldVal)
+                                                                    res.get(key).values.get(0).val = newVal;
+                                                                break;
+                                                            }
+                                                            case "avg": {
+                                                                res.get(key).values.get(0).val += newVal;
+                                                                res.get(key).values.get(0).timestamp += data.get(key).values.get(0).timestamp;
+                                                                break;
+                                                            }
+                                                        }
+                                                    } else res.put(key, data.get(key));
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (res != null) {
+                                        for (MetricKey key : res.keySet()) {
+                                            if (aggreg.equals("avg")) {
+                                                Monitoring oldMon = res.get(key);
+                                                double finalValue = oldMon.values.get(0).val / oldMon.values.get(0).timestamp;
+                                                List<TimedMetric> tmp = new ArrayList<>();
+                                                tmp.add(new TimedMetric(finalValue, null));
+                                                Monitoring newMon = new Monitoring(oldMon.metadata, tmp);
+                                                res.replace(key, newMon);
+                                            }
+                                            result.append(beautifyMonitoring(key, res.get(key).metadata, res.get(key).values)).append(",");
+                                            result.deleteCharAt(result.length() - 1);
+                                        }
+                                    }
                                 }
-                            } else { //Get local data
-                                result = (from > -1) ? extractMonitoring(filters, from, to) : extractMonitoring(filters);
+                            }
+                            //Get values
+                            else {
+                                if (servers != null) { //Get data from the cluster
+                                    for (ClusterNode server : servers.nodes()) {
+                                        DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
+                                                DataInterface.class, false);
+                                        String nodeData = (from > -1) ? extractionInterface.extractMonitoringJson(filters, from, to) : extractionInterface.extractMonitoringJson(filters);
+                                        if (nodeData != null)
+                                            result.append("{\"node\": \"").append(server.hostNames()).append("\", \"data\": [").append(nodeData).append("]}");
+                                    }
+                                } else { //Get local data
+                                    if (from > -1) result.append(extractMonitoringJson(filters, from, to));
+                                    else result.append(extractMonitoringJson(filters));
+                                }
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
                         }
                     }
-                    String finalRes = "{\"monitoring\": [ " + String.join(", ", result) + " ]} ";
-                    return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
+                    result.append("]}");
+                    return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
+                }
+                //get LIST of monitoring metrics
+                else if (matches(buf, req.path, URI_LIST)) {
+                    StringBuilder result = new StringBuilder("{\"metric\": [");
+                    //Read and parse json
+                    String body = buf.get(req.body);
+                    if (!body.equals("")) { //Check if body has filters
+                        JSONObject obj = new JSONObject(body);
+                        try {
+                            //Get filters
+                            HashMap<String, HashSet<String>> filters = new HashMap<>();
+                            if (obj.has("metricID"))
+                                filters.put("metricID", new HashSet<>(obj.getJSONArray("metricID").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("entityID"))
+                                filters.put("entityID", new HashSet<>(obj.getJSONArray("entityID").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("podName"))
+                                filters.put("podName", new HashSet<>(obj.getJSONArray("podName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("podNamespace"))
+                                filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            if (obj.has("containerName"))
+                                filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            //Get return fields
+                            HashSet<String> returns = new HashSet<>();
+                            if (obj.has("fields")) { //Get data from the cluster
+                                JSONArray nodes = obj.getJSONArray("fields");
+                                returns.addAll(nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new)));
+                            }
+                            //Get server list
+                            ClusterGroup servers = ignite.cluster().forServers();
+                            //Get data from the cluster
+                            HashMap<MetricKey, MetaMetric> metricData = new HashMap<>();
+                            for (ClusterNode server : servers.nodes()) {
+                                DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
+                                        DataInterface.class, false);
+                                metricData.putAll(extractionInterface.extractMeta(filters));
+                            }
+                            if(!metricData.isEmpty()) {
+                                metricData.forEach((k, v) -> result.append("{").append(k).append(",").append((returns.isEmpty()) ? v : v.toString(returns)).append("},"));
+                                result.deleteCharAt(result.length() - 1);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                        }
+                    }
+                    result.append("]}");
+                    return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
                 }
                 //PUT analytics data
                 else if (matches(buf, req.path, URI_ANALYTICS_PUT)) {
-                    HashMap<String, TimedMetric> data = new HashMap<>();
+                    HashMap<AnalyticKey, Metric> data = new HashMap<>();
                     //Read and parse json
                     try {
                         String body = buf.get(req.body);
@@ -314,7 +509,7 @@ public class DataService implements DataInterface {
                         for (int i = 0; i < analytics.length(); i++) {
                             JSONObject o = analytics.getJSONObject(i);
                             if (o.has("key") && o.has("val") && o.has("timestamp")) {
-                                data.put(o.getString("key"), new TimedMetric(o.getDouble("val"), o.getLong("timestamp")));
+                                data.put(new AnalyticKey(o.getString("key"), o.getLong("timestamp")), new Metric(o.getDouble("val")));
                             }
                         }
                         ingestAnalytics(data);
@@ -326,7 +521,7 @@ public class DataService implements DataInterface {
                 }
                 //GET analytics data
                 else if (matches(buf, req.path, URI_ANALYTICS_GET)) {
-                    HashMap<String, String> result = new HashMap<>();
+                    StringBuilder result = new StringBuilder("{\"analytics\": [");
                     //Read and parse json
                     String body = buf.get(req.body);
                     if (!body.equals("")) { //Check if body has filters
@@ -337,27 +532,20 @@ public class DataService implements DataInterface {
                                 JSONArray tmpKeys = obj.getJSONArray("key");
                                 ids.addAll(tmpKeys.toList().stream().map(Object::toString).collect(Collectors.toList()));
                             }
-                            if (obj.has("nodes")) { //Get data from the cluster
-                                JSONArray nodes = obj.getJSONArray("nodes");
-                                HashSet<String> nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
-                                ClusterGroup servers = (nodesList.isEmpty()) ? ignite.cluster().forServers() : ignite.cluster().forServers().forPredicate(getNodesByHostnames(nodesList));
-                                for (ClusterNode server : servers.nodes()) {
-                                    DataInterface extractionInterface = ignite.services(ignite.cluster().forNodeId(server.id())).serviceProxy(DataInterface.SERVICE_NAME,
-                                            DataInterface.class, false);
-                                    HashMap<String, String> nodeData = extractionInterface.extractAnalytics(ids);
-                                    if (!nodeData.isEmpty())
-                                        result.put(server.id().toString(), "{\"node\": \"" + server.hostNames().toString() + "\", \"data\": [ " + String.join(", ", nodeData.values()) + " ]} ");
-                                }
-                            } else { //Get local data
-                                result = extractAnalytics(ids);
+                            long from = -1, to = -1;
+                            if (obj.has("from") && obj.has("to") && obj.getLong("from") >= 0 && obj.getLong("to") >= obj.getLong("from")) {
+                                from = obj.getLong("from");
+                                to = obj.getLong("to");
                             }
+                            if (from > -1) result.append(extractAnalyticsJson(ids, from, to));
+                            else result.append(extractAnalyticsJson(ids));
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
                         }
                     }
-                    String finalRes = "{\"analytics\": [ " + String.join(", ", result.values()) + " ]} ";
-                    return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
+                    result.append("]}");
+                    return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
                 }
                 //PUT application data
                 else if (myApp != null && matches(buf, req.path, URI_APP_PUT)) {
@@ -415,35 +603,111 @@ public class DataService implements DataInterface {
     }
 
     //-----------PUBLIC FUNCTIONS--------------
+
     @Override
-    //Extract latest
-    public ArrayList<String> extractMonitoring(HashMap<String, HashSet<String>> ids) {
-        ArrayList<String> result = new ArrayList<>();
-        HashMap<MetricKey, String> metaValues = extractMeta(ids);
-        for (MetricKey myKey: metaValues.keySet()){
-            String data = extractLatestData(myKey);
-            result.add(" { \"metricID\": \"" + myKey.metricID + "\" , \"entityID\": \"" + myKey.entityID + "\", " + data + " , " + metaValues.getOrDefault(myKey, "") + " } ");
+    //Extract only meta data
+    public HashMap<MetricKey, MetaMetric> extractMeta(HashMap<String, HashSet<String>> filter) {
+        return extractMetaData(filter);
+    }
+
+    @Override
+    //Extract latest monitoring data
+    public HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter) {
+        HashMap<MetricKey, Monitoring> result = new HashMap<>();
+        HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
+        for (MetricKey myKey : metaValues.keySet()) {
+            List<TimedMetric> data = extractMonitoringData(myKey);
+            result.put(myKey, new Monitoring(metaValues.get(myKey), data));
         }
         return result;
     }
 
     @Override
-    //Extract historical
-    public ArrayList<String> extractMonitoring(HashMap<String, HashSet<String>> ids, Long from, Long to) {
-        ArrayList<String> result = new ArrayList<>();
-        HashMap<MetricKey, String> metaValues = extractMeta(ids);
-        for (MetricKey myKey: metaValues.keySet()){
-            String data = extractHistoricalData(myKey, from, to);
-            result.add(" { \"metricID\": \"" + myKey.metricID + "\" , \"entityID\": \"" + myKey.entityID + "\", " + data + " , " + metaValues.getOrDefault(myKey, "") + " } ");
+    //Extract historical monitoring data
+    public HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to) {
+        HashMap<MetricKey, Monitoring> result = new HashMap<>();
+        HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
+        for (MetricKey myKey : metaValues.keySet()) {
+            List<TimedMetric> data = extractMonitoringData(myKey, from, to);
+            result.put(myKey, new Monitoring(metaValues.get(myKey), data));
         }
         return result;
     }
 
     @Override
-    //Extract analytics
-    public HashMap<String, String> extractAnalytics(Set<String> ids) {
-        HashMap<String, String> result = extractAnalyticsData(ids);
-        result.replaceAll((k, v) -> "{ \"key\": \"" + k + "\", " + result.get(k) + " } ");
+    //Extract historical monitoring data with aggregation
+    public HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, String agg) {
+        HashMap<MetricKey, Monitoring> result = new HashMap<>();
+        HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
+        for (MetricKey myKey : metaValues.keySet()) {
+            List<TimedMetric> data = extractMonitoringData(myKey, from, to, agg);
+            result.put(myKey, new Monitoring(metaValues.get(myKey), data));
+        }
         return result;
     }
+
+    @Override
+    //Extract latest monitoring as json string
+    public String extractMonitoringJson(HashMap<String, HashSet<String>> filter) {
+        StringBuilder result = new StringBuilder();
+        HashMap<MetricKey, Monitoring> data = extractMonitoring(filter);
+        if (!data.isEmpty()) {
+            data.forEach((k, v) -> result.append(beautifyMonitoring(k, v.metadata, v.values)).append(","));
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.toString();
+    }
+
+    @Override
+    //Extract historical monitoring as json string
+    public String extractMonitoringJson(HashMap<String, HashSet<String>> filter, Long from, Long to) {
+        StringBuilder result = new StringBuilder();
+        HashMap<MetricKey, Monitoring> data = extractMonitoring(filter, from, to);
+        if (!data.isEmpty()) {
+            data.forEach((k, v) -> result.append(beautifyMonitoring(k, v.metadata, v.values)).append(","));
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.toString();
+    }
+
+    @Override
+    //Extract latest analytics data
+    public HashMap<String, List<TimedMetric>> extractAnalytics(Set<String> filter) {
+        HashMap<String, List<TimedMetric>> result = new HashMap<>();
+        for (String key : filter) result.put(key, extractAnalyticsData(key));
+        return result;
+    }
+
+    @Override
+    //Extract historical analytics data
+    public HashMap<String, List<TimedMetric>> extractAnalytics(Set<String> filter, long from, long to) {
+        HashMap<String, List<TimedMetric>> result = new HashMap<>();
+        for (String key : filter) result.put(key, extractAnalyticsData(key, from, to));
+        return result;
+    }
+
+    @Override
+    //Extract latest analytics as json string
+    public String extractAnalyticsJson(Set<String> keys) {
+        StringBuilder result = new StringBuilder();
+        HashMap<String, List<TimedMetric>> data = extractAnalytics(keys);
+        if (!data.isEmpty()) {
+            data.forEach((k, v) -> result.append(beautifyAnalytics(k, v)).append(","));
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.toString();
+    }
+
+    @Override
+    //Extract historical analytics as json string
+    public String extractAnalyticsJson(Set<String> keys, long from, long to) {
+        StringBuilder result = new StringBuilder();
+        HashMap<String, List<TimedMetric>> data = extractAnalytics(keys, from, to);
+        if (!data.isEmpty()) {
+            data.forEach((k, v) -> result.append(beautifyAnalytics(k, v)).append(","));
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.toString();
+    }
+
 }

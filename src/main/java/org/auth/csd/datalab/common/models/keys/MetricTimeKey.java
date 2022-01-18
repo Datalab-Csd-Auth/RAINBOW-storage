@@ -1,6 +1,7 @@
-package org.auth.csd.datalab.common.models;
+package org.auth.csd.datalab.common.models.keys;
 
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
+import org.auth.csd.datalab.common.models.InputJson;
 
 public class MetricTimeKey extends MetricKey {
 
@@ -24,10 +25,8 @@ public class MetricTimeKey extends MetricKey {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"metricID\": \"" + metricID + "\"" +
+        return  "\"metricID\": \"" + metricID + "\"" +
                 ", \"entityID\": \"" + entityID + "\"" +
-                ", \"timestamp\": " + timestamp +
-                '}';
+                ", \"timestamp\": " + timestamp;
     }
 }
