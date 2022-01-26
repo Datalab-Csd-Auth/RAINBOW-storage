@@ -8,6 +8,8 @@ import org.apache.ignite.services.ServiceConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
+import org.auth.csd.datalab.common.filter.HeadFilter;
+import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
 import org.auth.csd.datalab.common.models.keys.AnalyticKey;
 import org.auth.csd.datalab.common.models.keys.MetricKey;
 import org.auth.csd.datalab.common.models.keys.MetricTimeKey;
@@ -15,6 +17,7 @@ import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 import org.auth.csd.datalab.services.DataService;
+import org.auth.csd.datalab.services.RebalanceService;
 
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
@@ -24,13 +27,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
-import static org.auth.csd.datalab.common.interfaces.DataInterface.SERVICE_NAME;
 
 /**
  * A new Data Node will be started in a separate JVM process when this class gets executed.
  */
 public class ServerNodeStartup {
 
+    public static final Boolean cluster_head = readEnvVariable("CLUSTER_HEAD") != null && Boolean.parseBoolean(readEnvVariable("CLUSTER_HEAD"));
     public static final Boolean app_cache = readEnvVariable("APP_CACHE") != null && Boolean.parseBoolean(readEnvVariable("APP_CACHE"));
     public static final String latestCacheName = "LatestMonitoring";
     public static final String historicalCacheName = "HistoricalMonitoring";
@@ -41,29 +44,26 @@ public class ServerNodeStartup {
     private static long totalSize = 512;
     private static final String defaultRegionName = "Default_Region";
     private static final String persistenceRegionName = "Persistent_Region";
-
     public static void createServer(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(60000);
-        System.out.println(ignite.cluster().localNode().id());
+        System.out.println("Local node id: " + ignite.cluster().localNode().consistentId());
     }
 
     private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
         //Set cluster identification and custom parameters
-        //System.setProperty("java.net.preferIPv4Stack", "true"); //Only use ipv4
         //Get eviction rate
         String tmpEvict = readEnvVariable("EVICTION");
         if (tmpEvict != null) evictionHours = Integer.parseInt(tmpEvict);
         //Get total size of data regions
         String tmpSize = readEnvVariable("SIZE");
         if (tmpSize != null) totalSize = Long.parseLong(tmpSize);
-        //Split size between the 2 regions
-        long regionSize = Math.max(totalSize / 2, 100);
         //Set attributes
         Map<String, Boolean> myAtrr = new HashMap<>();
         myAtrr.put("data.node", true);
+        myAtrr.put("data.head", cluster_head);
         //Create context
         IgniteConfiguration cfg = new IgniteConfiguration();
         cfg.setPeerClassLoadingEnabled(true);
@@ -72,27 +72,8 @@ public class ServerNodeStartup {
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
-        //Set data regions
-        DataStorageConfiguration dsc = new DataStorageConfiguration();
-        //Default region
-        DataRegionConfiguration defaultRegion = new DataRegionConfiguration();
-        defaultRegion.setName(defaultRegionName);
-        defaultRegion.setInitialSize(100 * 1024 * 1024);
-        defaultRegion.setMaxSize(regionSize * 1024 * 1024);
-        defaultRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
-        defaultRegion.setMetricsEnabled(true);
-        dsc.setDefaultDataRegionConfiguration(defaultRegion);
-        //Persistence region
-        DataRegionConfiguration regionWithPersistence = new DataRegionConfiguration();
-        regionWithPersistence.setName(persistenceRegionName);
-        regionWithPersistence.setInitialSize(100 * 1024 * 1024);
-        regionWithPersistence.setMaxSize(regionSize * 1024 * 1024);
-        regionWithPersistence.setPersistenceEnabled(true);
-        regionWithPersistence.setMetricsEnabled(true);
-        dsc.setDataRegionConfigurations(regionWithPersistence);
-        //Add to context
-        cfg.setDataStorageConfiguration(dsc);
-
+        //Add the data regions to context
+        cfg.setDataStorageConfiguration(dataStorageConfiguration());
         //Cache configurations
         //Latest monitoring data cache
         CacheConfiguration<MetricKey, TimedMetric> latestCfg = new CacheConfiguration<>(latestCacheName);
@@ -132,7 +113,8 @@ public class ServerNodeStartup {
         } else {
             cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);
         }
-        cfg.setServiceConfiguration(serviceConfiguration());
+        //Activate services on nodes
+        cfg.setServiceConfiguration(dataServiceConfiguration(), rebalanceServiceConfiguration());
 
         /*
         //=============DEBUG Logging
@@ -144,18 +126,51 @@ public class ServerNodeStartup {
         logExporter.setPeriod(1000);
         cfg.setMetricExporterSpi(logExporter);
          */
-
         return cfg;
     }
 
-    private static ServiceConfiguration serviceConfiguration() {
-        // Gives back a Node Singleton Service
-        ServiceConfiguration cfg = new ServiceConfiguration();
-        cfg.setName(SERVICE_NAME);
-        cfg.setMaxPerNodeCount(1);
-        cfg.setNodeFilter(new DataFilter());
-        cfg.setService(new DataService());
-        return cfg;
+    private static ServiceConfiguration rebalanceServiceConfiguration() {
+        //Gives back a Node Singleton Service
+        ServiceConfiguration sCfg = new ServiceConfiguration();
+        sCfg.setName(RebalanceInterface.SERVICE_NAME);
+        sCfg.setMaxPerNodeCount(1);
+        sCfg.setNodeFilter(new HeadFilter());
+        sCfg.setService(new RebalanceService());
+        return sCfg;
+    }
+
+    private static ServiceConfiguration dataServiceConfiguration() {
+        //Gives back a Node Singleton Service
+        ServiceConfiguration sCfg = new ServiceConfiguration();
+        sCfg.setName(DataService.SERVICE_NAME);
+        sCfg.setMaxPerNodeCount(1);
+        sCfg.setNodeFilter(new DataFilter());
+        sCfg.setService(new DataService());
+        return sCfg;
+    }
+
+    private static DataStorageConfiguration dataStorageConfiguration() {
+        //Split size between the 2 regions
+        long regionSize = Math.max(totalSize / 2, 100);
+        //Set data regions
+        DataStorageConfiguration dsc = new DataStorageConfiguration();
+        //Default in-memory region
+        DataRegionConfiguration defaultRegion = new DataRegionConfiguration();
+        defaultRegion.setName(defaultRegionName);
+        defaultRegion.setInitialSize(100 * 1024 * 1024); //100 mb
+        defaultRegion.setMaxSize(regionSize * 1024 * 1024); //default is 256 mb
+        defaultRegion.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
+        defaultRegion.setMetricsEnabled(true);
+        dsc.setDefaultDataRegionConfiguration(defaultRegion);
+        //Persistence region
+        DataRegionConfiguration regionWithPersistence = new DataRegionConfiguration();
+        regionWithPersistence.setName(persistenceRegionName);
+        regionWithPersistence.setInitialSize(100 * 1024 * 1024); //100 mb
+        regionWithPersistence.setMaxSize(regionSize * 1024 * 1024); //default is 256 mb
+        regionWithPersistence.setPersistenceEnabled(true);
+        regionWithPersistence.setMetricsEnabled(true);
+        dsc.setDataRegionConfigurations(regionWithPersistence);
+        return dsc;
     }
 
 }

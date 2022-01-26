@@ -98,6 +98,21 @@ public class DataService implements DataInterface {
         return cache.query(query);
     }
 
+    private HashMap<String, HashSet<String>> getFilters(JSONObject obj){
+        HashMap<String, HashSet<String>> filters = new HashMap<>();
+        if (obj.has("metricID"))
+            filters.put("metricID", new HashSet<>(obj.getJSONArray("metricID").toList().stream().map(Object::toString).collect(Collectors.toList())));
+        if (obj.has("entityID"))
+            filters.put("entityID", new HashSet<>(obj.getJSONArray("entityID").toList().stream().map(Object::toString).collect(Collectors.toList())));
+        if (obj.has("podName"))
+            filters.put("podName", new HashSet<>(obj.getJSONArray("podName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+        if (obj.has("podNamespace"))
+            filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
+        if (obj.has("containerName"))
+            filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+        return filters;
+    }
+
     //------------APP cache----------------
     private void ingestAppData(HashMap<String, String> data) {
         for (Map.Entry<String, String> entry : data.entrySet()) {
@@ -140,8 +155,9 @@ public class DataService implements DataInterface {
                 "WHERE a.key = '" + key + "'";
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
-            for (List<?> row : cursor)
+            for (List<?> row : cursor) {
                 result.add(new TimedMetric((Double) row.get(2), (long) row.get(1)));
+            }
         }
         return result;
     }
@@ -155,6 +171,19 @@ public class DataService implements DataInterface {
                 result.add(new TimedMetric((Double) row.get(2), (long) row.get(1)));
         }
         return result;
+    }
+
+    private boolean deleteAnalytics(HashSet<String> ids){
+        String sql = "DELETE " +
+                "FROM METRIC " +
+                "WHERE key IN  ('" + String.join("','", ids) + "')";
+        // Iterate over the result set.
+        try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
+            for (List<?> row : cursor) {
+                return !((Long)row.get(0) == 0);
+            }
+        }
+        return false;
     }
 
     //------------MONITORING----------------
@@ -276,11 +305,18 @@ public class DataService implements DataInterface {
     //------------API----------------
     private class CustomHttpServer extends AbstractHttpServer {
 
+        //Requests
+        private final byte[] REQ_POST = "POST".getBytes();
+        private final byte[] REQ_GET = "GET".getBytes();
+        private final byte[] REQ_DEL = "DELETE".getBytes();
+        //Helpers
+        private final byte[] URI_NODES = "/nodes".getBytes();
         //Monitoring
         private final byte[] URI_PUT = "/put".getBytes();
         private final byte[] URI_GET = "/get".getBytes();
         private final byte[] URI_LIST = "/list".getBytes();
         //Analytics cache
+        private final byte[] URI_ANALYTICS = "/analytics".getBytes();
         private final byte[] URI_ANALYTICS_PUT = "/analytics/put".getBytes();
         private final byte[] URI_ANALYTICS_GET = "/analytics/get".getBytes();
         //App cache
@@ -289,7 +325,7 @@ public class DataService implements DataInterface {
 
         @Override
         protected HttpStatus handle(Channel ctx, Buf buf, RapidoidHelper req) {
-            if (!req.isGet.value) {
+            if (matches(buf, req.verb, REQ_POST)) {
                 //PUT monitoring data
                 if (matches(buf, req.path, URI_PUT)) {
                     //Data structure for metrics
@@ -333,17 +369,7 @@ public class DataService implements DataInterface {
                                 to = obj.getLong("to");
                             }
                             //Get filters
-                            HashMap<String, HashSet<String>> filters = new HashMap<>();
-                            if (obj.has("metricID"))
-                                filters.put("metricID", new HashSet<>(obj.getJSONArray("metricID").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("entityID"))
-                                filters.put("entityID", new HashSet<>(obj.getJSONArray("entityID").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("podName"))
-                                filters.put("podName", new HashSet<>(obj.getJSONArray("podName").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("podNamespace"))
-                                filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("containerName"))
-                                filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            HashMap<String, HashSet<String>> filters = getFilters(obj);
                             //Get nodes
                             ClusterGroup servers = null;
                             if (obj.has("nodes")) { //Get data from the cluster
@@ -459,17 +485,7 @@ public class DataService implements DataInterface {
                         JSONObject obj = new JSONObject(body);
                         try {
                             //Get filters
-                            HashMap<String, HashSet<String>> filters = new HashMap<>();
-                            if (obj.has("metricID"))
-                                filters.put("metricID", new HashSet<>(obj.getJSONArray("metricID").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("entityID"))
-                                filters.put("entityID", new HashSet<>(obj.getJSONArray("entityID").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("podName"))
-                                filters.put("podName", new HashSet<>(obj.getJSONArray("podName").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("podNamespace"))
-                                filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
-                            if (obj.has("containerName"))
-                                filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
+                            HashMap<String, HashSet<String>> filters = getFilters(obj);
                             //Get return fields
                             HashSet<String> returns = new HashSet<>();
                             if (obj.has("fields")) { //Get data from the cluster
@@ -597,6 +613,45 @@ public class DataService implements DataInterface {
                     String finalRes = "{\"application\": [ " + String.join(", ", metaValues) + " ]} ";
                     return json(ctx, req.isKeepAlive.value, finalRes.getBytes());
                 }
+                //GET list of nodes
+                else if(matches(buf, req.path, URI_NODES)){
+                    StringBuilder result = new StringBuilder("{\"nodes\": [");
+                    ClusterGroup servers = ignite.cluster().forServers();
+                    servers.nodes().forEach(s -> result
+                            .append("{\"id\": \"")
+                            .append(s.consistentId())
+                            .append("\",\"hostname\": \"")
+                            .append(s.hostNames())
+                            .append("\",")
+                            .append("\"cluster_head\": ")
+                            .append((Boolean) s.attribute("data.head"))
+                            .append("},"));
+                    if(servers.nodes().size() > 0) result.deleteCharAt(result.length() - 1);
+                    result.append("]}");
+                    return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
+                }
+            }else if (matches(buf, req.verb, REQ_DEL)){
+                //Delete analytics
+                if (matches(buf, req.path, URI_ANALYTICS)) {
+                    //Read and parse json
+                    String body = buf.get(req.body);
+                    if (!body.equals("")) { //Check if body has filters
+                        JSONObject obj = new JSONObject(body);
+                        try {
+                            HashSet<String> ids = new HashSet<>();
+                            if (obj.has("key")) {
+                                JSONArray tmpKeys = obj.getJSONArray("key");
+                                ids.addAll(tmpKeys.toList().stream().map(Object::toString).collect(Collectors.toList()));
+                            }
+                            //Delete stuff
+                            if(!ids.isEmpty() && deleteAnalytics(ids)) return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", ""));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", ""));
+                        }
+                    }
+                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", ""));
+                }
             }
             return HttpStatus.NOT_FOUND;
         }
@@ -674,7 +729,10 @@ public class DataService implements DataInterface {
     //Extract latest analytics data
     public HashMap<String, List<TimedMetric>> extractAnalytics(Set<String> filter) {
         HashMap<String, List<TimedMetric>> result = new HashMap<>();
-        for (String key : filter) result.put(key, extractAnalyticsData(key));
+        for (String key : filter) {
+            List<TimedMetric> tmpRes = extractAnalyticsData(key);
+            if(!tmpRes.isEmpty()) result.put(key, tmpRes);
+        }
         return result;
     }
 
@@ -682,7 +740,10 @@ public class DataService implements DataInterface {
     //Extract historical analytics data
     public HashMap<String, List<TimedMetric>> extractAnalytics(Set<String> filter, long from, long to) {
         HashMap<String, List<TimedMetric>> result = new HashMap<>();
-        for (String key : filter) result.put(key, extractAnalyticsData(key, from, to));
+        for (String key : filter) {
+            List<TimedMetric> tmpRes = extractAnalyticsData(key, from, to);
+            if(!tmpRes.isEmpty()) result.put(key, tmpRes);
+        }
         return result;
     }
 

@@ -8,5 +8,5 @@ public interface RebalanceInterface extends Service {
     /** Service name */
     public static final String SERVICE_NAME = "RebalanceService";
 
-    public Void rebalanceData(Set<String> keys);
+//    public Void rebalanceData(Set<String> keys);
 }

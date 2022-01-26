@@ -17,16 +17,13 @@ public class NodeStartup {
     public static final String discoveryDelimiter = ",";
 
     public static void main(String[] args) throws IgniteException, UnknownHostException, IgniteCheckedException {
-        //Get instance type
-        String instance = (readEnvVariable("NODE") != null && Objects.equals(readEnvVariable("NODE"), "CLIENT")) ? "CLIENT" : "SERVER";
         //Get hostname
         String hostname = (readEnvVariable("HOSTNAME") != null) ? readEnvVariable("HOSTNAME") : InetAddress.getLocalHost().getHostName();
         //Get discovery servers
         String discovery = (readEnvVariable("DISCOVERY") != null) ? readEnvVariable("DISCOVERY") : hostname;
         System.out.println("Discovery servers: " + discovery);
         System.out.println("Hostname: " + hostname);
-        if(instance.equals("CLIENT")) ClientNodeStartup.createClient(discovery, hostname);
-        else ServerNodeStartup.createServer(discovery, hostname);
+        ServerNodeStartup.createServer(discovery, hostname);
     }
 
 

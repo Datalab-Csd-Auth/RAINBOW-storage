@@ -12,15 +12,15 @@ import java.util.*;
 
 public class RebalanceService implements RebalanceInterface {
 
-    //TODO ENV variables
-    private String monName = "Monitoring";
-    private String metaName = "Metadata";
+//    //TODO ENV variables
+//    private String monName = "Monitoring";
+//    private String metaName = "Metadata";
     @IgniteInstanceResource
     private Ignite ignite;
-    /** Reference to the cache. */
-    private IgniteCache<String, String> metaCache;
-    private IgniteCache<String, Object> monCache;
-    private String delimiter = ".";
+//    /** Reference to the cache. */
+//    private IgniteCache<String, String> metaCache;
+//    private IgniteCache<String, Object> monCache;
+//    private String delimiter = ".";
     /**
      * TODO node can have 1 status."
      * status = 0, normal state
@@ -39,16 +39,17 @@ public class RebalanceService implements RebalanceInterface {
     UUID localNode = null;
 
     /** {@inheritDoc} */
+    //TODO work with consistent id
     public void init(ServiceContext ctx) throws Exception {
         System.out.println("Initializing Rebalance Service on node:" + ignite.cluster().localNode());
         /**
          * It's assumed that the cache has already been deployed. To do that, make sure to start Data Nodes with
          * a respective cache configuration.
          */
-        metaCache = ignite.cache(metaName);
-        monCache = ignite.cache(monName);
-        localNode = ignite.cluster().localNode().id();
-        metaCache.put(localNode.toString() + delimiter + "local", localNode.toString());
+//        metaCache = ignite.cache(metaName);
+//        monCache = ignite.cache(monName);
+//        localNode = ignite.cluster().localNode().id();
+//        metaCache.put(localNode.toString() + delimiter + "local", localNode.toString());
     }
 
     /** {@inheritDoc} */
@@ -61,6 +62,7 @@ public class RebalanceService implements RebalanceInterface {
         System.out.println("Stopping Rebalance Service on node:" + ignite.cluster().localNode());
     }
 
+    /*
     @Override
     public Void rebalanceData(Set<String> keys) {
         //Start by checking if state is partitioned/replicated and remote node still exists
@@ -106,7 +108,7 @@ public class RebalanceService implements RebalanceInterface {
     }
 
     private void partitionData(){
-        /*
+
         System.out.println("Partitioning data from " + localNode + " to " + externalNode);
         //TODO Create the filter
         if(localFilter == null) localFilter = "local" + delimiter + "application";
@@ -126,11 +128,11 @@ public class RebalanceService implements RebalanceInterface {
                 IngestionInterface.class, false);
         ingestionInterface.ingestData(data);
 
-         */
+
     }
 
     private void replicateData(){
-        /*
+
         System.out.println("Replicating data from " + localNode + " to " + externalNode);
         //Get all local data
         ExtractionService extractionService = ignite.services(ignite.cluster().forLocal()).serviceProxy(ExtractionInterface.SERVICE_NAME,
@@ -150,7 +152,7 @@ public class RebalanceService implements RebalanceInterface {
                 IngestionInterface.class, false);
         ingestionInterface.ingestData(data);
 
-         */
-    }
+
+    }*/
 
 }
