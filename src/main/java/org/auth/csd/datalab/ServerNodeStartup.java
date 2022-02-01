@@ -10,20 +10,18 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
 import org.auth.csd.datalab.common.filter.HeadFilter;
 import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
-import org.auth.csd.datalab.common.models.keys.AnalyticKey;
-import org.auth.csd.datalab.common.models.keys.MetricKey;
-import org.auth.csd.datalab.common.models.keys.MetricTimeKey;
+import org.auth.csd.datalab.common.models.keys.*;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
-import org.auth.csd.datalab.services.DataService;
-import org.auth.csd.datalab.services.RebalanceService;
+import org.auth.csd.datalab.services.*;
 
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
@@ -33,23 +31,35 @@ import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
  */
 public class ServerNodeStartup {
 
+    //Get env variables
     public static final Boolean cluster_head = readEnvVariable("CLUSTER_HEAD") != null && Boolean.parseBoolean(readEnvVariable("CLUSTER_HEAD"));
     public static final Boolean app_cache = readEnvVariable("APP_CACHE") != null && Boolean.parseBoolean(readEnvVariable("APP_CACHE"));
+    //Monitoring caches
     public static final String latestCacheName = "LatestMonitoring";
     public static final String historicalCacheName = "HistoricalMonitoring";
     public static final String metaCacheName = "MetaMonitoring";
-    public static final String appCacheName = "ApplicationData";
+    //Analytics cache
     public static final String analyticsCacheName = "Analytics";
+    //Local consistent id
+    public static String localNode = null;
+    //Replicas monitoring caches
+    public static final String replicaLatestCacheName = "ReplicaLatestMonitoring";
+    public static final String replicaHistoricalCacheName = "ReplicaHistoricalMonitoring";
+    public static final String replicaMetaCacheName = "ReplicaMetaMonitoring";
+    //Optional application cache
+    public static final String appCacheName = "ApplicationData";
     private static int evictionHours = 168;
     private static long totalSize = 512;
     private static final String defaultRegionName = "Default_Region";
     private static final String persistenceRegionName = "Persistent_Region";
+
     public static void createServer(String discovery, String hostname) throws IgniteException {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(60000);
-        System.out.println("Local node id: " + ignite.cluster().localNode().consistentId());
+        localNode = hostname;
+        System.out.println("Local node id: " + localNode);
     }
 
     private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
@@ -102,19 +112,41 @@ public class ServerNodeStartup {
                 .setDataRegionName(persistenceRegionName)
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
+        //Replica caches
+        //Replica Latest monitoring cache
+        CacheConfiguration<ReplicaMetricKey, TimedMetric> replicaLatestCfg = new CacheConfiguration<>(replicaLatestCacheName);
+        latestCfg.setCacheMode(CacheMode.LOCAL)
+                .setIndexedTypes(ReplicaMetricKey.class, TimedMetric.class)
+                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                .setEagerTtl(true);
+        //Replica Metadata cache (metric meta)
+        CacheConfiguration<ReplicaMetricKey, MetaMetric> replicaMetaCfg = new CacheConfiguration<>(replicaMetaCacheName);
+        metaCfg.setCacheMode(CacheMode.LOCAL)
+                .setIndexedTypes(ReplicaMetricKey.class, MetaMetric.class)
+                .setDataRegionName(persistenceRegionName)
+                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                .setEagerTtl(true);
+        //Replica Historical monitoring data cache
+        CacheConfiguration<ReplicaMetricTimeKey, Metric> replicaHistoricalCfg = new CacheConfiguration<>(replicaHistoricalCacheName);
+        historicalCfg.setCacheMode(CacheMode.LOCAL)
+                .setIndexedTypes(ReplicaMetricTimeKey.class, Metric.class)
+                .setDataRegionName(persistenceRegionName)
+                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
+                .setEagerTtl(true);
         //Optional application k-v cache
         if (app_cache) {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,
-                    new CacheConfiguration<>(appCacheName)
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg,
+                    new CacheConfiguration<AnalyticKey, Metric>(appCacheName)
                             .setCacheMode(CacheMode.LOCAL)
+                            .setIndexedTypes(AnalyticKey.class, Metric.class)
                             .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                             .setEagerTtl(true)
             );
         } else {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg);
         }
         //Activate services on nodes
-        cfg.setServiceConfiguration(dataServiceConfiguration(), rebalanceServiceConfiguration());
+        cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), rebalanceServiceConfiguration());
 
         /*
         //=============DEBUG Logging
@@ -126,7 +158,38 @@ public class ServerNodeStartup {
         logExporter.setPeriod(1000);
         cfg.setMetricExporterSpi(logExporter);
          */
+
         return cfg;
+    }
+
+    private static ServiceConfiguration httpServiceConfiguration() {
+        //Gives back a Node Singleton Service
+        ServiceConfiguration sCfg = new ServiceConfiguration();
+        sCfg.setName(HttpService.SERVICE_NAME);
+        sCfg.setMaxPerNodeCount(1);
+        sCfg.setNodeFilter(new DataFilter());
+        sCfg.setService(new HttpService());
+        return sCfg;
+    }
+
+    private static ServiceConfiguration dataMngmServiceConfiguration() {
+        //Gives back a Node Singleton Service
+        ServiceConfiguration sCfg = new ServiceConfiguration();
+        sCfg.setName(DataManagement.SERVICE_NAME);
+        sCfg.setMaxPerNodeCount(1);
+        sCfg.setNodeFilter(new DataFilter());
+        sCfg.setService(new DataManagement());
+        return sCfg;
+    }
+
+    private static ServiceConfiguration movementServiceConfiguration() {
+        //Gives back a Node Singleton Service
+        ServiceConfiguration sCfg = new ServiceConfiguration();
+        sCfg.setName(MovementService.SERVICE_NAME);
+        sCfg.setMaxPerNodeCount(1);
+        sCfg.setNodeFilter(new DataFilter());
+        sCfg.setService(new MovementService());
+        return sCfg;
     }
 
     private static ServiceConfiguration rebalanceServiceConfiguration() {
@@ -136,16 +199,6 @@ public class ServerNodeStartup {
         sCfg.setMaxPerNodeCount(1);
         sCfg.setNodeFilter(new HeadFilter());
         sCfg.setService(new RebalanceService());
-        return sCfg;
-    }
-
-    private static ServiceConfiguration dataServiceConfiguration() {
-        //Gives back a Node Singleton Service
-        ServiceConfiguration sCfg = new ServiceConfiguration();
-        sCfg.setName(DataService.SERVICE_NAME);
-        sCfg.setMaxPerNodeCount(1);
-        sCfg.setNodeFilter(new DataFilter());
-        sCfg.setService(new DataService());
         return sCfg;
     }
 

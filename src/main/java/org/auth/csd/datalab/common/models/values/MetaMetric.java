@@ -90,7 +90,6 @@ public class MetaMetric {
     }
 
     public String toString(Set<String> filter) {
-        System.out.println(filter);
         Set<String> pod = filter.stream().filter(k -> k.contains("pod")).collect(Collectors.toSet());
         Set<String> container = filter.stream().filter(k -> k.contains("container")).collect(Collectors.toSet());
         Set<String> newFilter = new HashSet<>(filter);
