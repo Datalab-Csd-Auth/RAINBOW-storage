@@ -20,7 +20,7 @@ public interface MovementInterface extends Service {
     void ingestMonitoring(HashMap<MetricKey, InputJson> metrics);
 
     HashMap<String, HashMap<MetricKey, Monitoring>> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList);
-    HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList, int agg);
+    Double extractMonitoringSingle(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList, int agg);
     HashMap<MetricKey, MetaMetric> extractMonitoringList(HashMap<String, HashSet<String>> filter);
 
     HashMap<String, Boolean> extractNodes();

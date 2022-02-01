@@ -6,10 +6,45 @@ import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.lang.IgnitePredicate;
 
+import javax.persistence.Tuple;
 import java.util.List;
 import java.util.Set;
 
 public class Helpers {
+
+    public static class Tuple2<K, V> {
+
+        public K first;
+        public V second;
+
+        public Tuple2(K first, V second){
+            this.first = first;
+            this.second = second;
+        }
+    }
+
+    public static Tuple2<Double, Long> combineTuples(Tuple2<Double, Long> tuple1, Tuple2<Double, Long> tuple2, int agg){
+        switch (agg){
+            case 0: {
+                if (tuple1.first > tuple2.first) return tuple1;
+                else return tuple2;
+            }
+            case 1: {
+                if (tuple1.first < tuple2.first) return tuple1;
+                else return tuple2;
+            }
+            case 2: {
+                tuple1.first += tuple2.first;
+                return tuple1;
+            }
+            case 3: {
+                tuple1.first += tuple2.first;
+                tuple1.second += tuple2.second;
+                return tuple1;
+            }
+        }
+        return null;
+    }
 
     /**
      * Method to read environment variables

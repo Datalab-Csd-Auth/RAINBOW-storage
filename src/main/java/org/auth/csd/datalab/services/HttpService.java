@@ -182,6 +182,7 @@ public class HttpService implements HttpInterface {
         private final byte[] URI_MON = "/monitoring".getBytes();
         private final byte[] URI_MON_PUT = "/put".getBytes();
         private final byte[] URI_MON_GET = "/get".getBytes();
+        private final byte[] URI_MON_QUERY = "/query".getBytes();
         private final byte[] URI_MON_LIST = "/list".getBytes();
         //Analytics cache
         private final byte[] URI_ANALYTICS = "/analytics".getBytes();
@@ -233,25 +234,18 @@ public class HttpService implements HttpInterface {
                             HashMap<String, HashSet<String>> filters = getFilters(obj);
                             //Get nodes
                             HashSet<String> nodesList = getNodes(obj);
-                            //Get aggregations
-                            int aggreg = (obj.has("agg") && aggregations.keySet().contains(obj.getString("agg"))) ? aggregations.get(obj.getString("agg")) : -1;
                             //Send stuff to movement service
                             MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
-                            if (aggreg >= 0 && aggreg < 4) {
-                                //TODO do stuff for aggregations
-                                HashMap<MetricKey, Monitoring> data = srvInterface.extractMonitoring(filters, from, to, nodesList, aggreg);
-                                //TODO important for AGGREG: entityID is based on the node
-                            } else {
-                                HashMap<String, HashMap<MetricKey, Monitoring>> data = srvInterface.extractMonitoring(filters, from, to, nodesList);
-                                for (String node : data.keySet()) {
-                                    result.append("{\"node\": \"").append(node).append("\", \"data\": [");
-                                    if (!data.get(node).isEmpty()) {
-                                        data.get(node).forEach((k, v) -> result.append(beautifyMonitoring(k, v.metadata, v.values)).append(","));
-                                        result.deleteCharAt(result.length() - 1);
-                                    }
-                                    result.append("]}");
+                            HashMap<String, HashMap<MetricKey, Monitoring>> data = srvInterface.extractMonitoring(filters, from, to, nodesList);
+                            for (String node : data.keySet()) {
+                                result.append("{\"node\": \"").append(node).append("\", \"data\": [");
+                                if (!data.get(node).isEmpty()) {
+                                    data.get(node).forEach((k, v) -> result.append(beautifyMonitoring(k, v.metadata, v.values)).append(","));
+                                    result.deleteCharAt(result.length() - 1);
                                 }
+                                result.append("]}");
                             }
+
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
@@ -259,6 +253,36 @@ public class HttpService implements HttpInterface {
                     }
                     result.append("]}");
                     return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
+                }
+                //GET monitoring aggregation
+                else if (matches(buf, req.path, URI_MON_QUERY)) {
+                    //Read and parse json
+                    String body = buf.get(req.body);
+                    if (!body.equals("")) { //Check if body has filters
+                        JSONObject obj = new JSONObject(body);
+                        try {
+                            //Get time for historical or latest if they are missing
+                            long from = getFrom(obj);
+                            long to = getTo(obj, from);
+                            //Get filters
+                            HashMap<String, HashSet<String>> filters = getFilters(obj);
+                            //Get nodes
+                            HashSet<String> nodesList = getNodes(obj);
+                            //Get aggregations
+                            int aggreg = (obj.has("agg") && aggregations.containsKey(obj.getString("agg"))) ? aggregations.get(obj.getString("agg")) : -1;
+                            //Send stuff to movement service
+                            MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+                            if (aggreg >= 0 && aggreg < 4) {
+                                Double data = srvInterface.extractMonitoringSingle(filters, from, to, nodesList, aggreg);
+                                return json(ctx, req.isKeepAlive.value, ("{\"value\": " + data + "}").getBytes());
+                            } else
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Wrong aggregation!"));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                        }
+                    }
+                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
                 }
                 //get LIST of monitoring metrics
                 else if (matches(buf, req.path, URI_MON_LIST)) {
@@ -419,6 +443,8 @@ public class HttpService implements HttpInterface {
                         JSONObject obj = new JSONObject(body);
                         try {
                             HashMap<String, HashSet<String>> filters = getFilters(obj);
+                            if (filters.isEmpty())
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
                             //Delete stuff
                             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                             if (srvInterface.deleteMonigoring(filters))
@@ -438,6 +464,8 @@ public class HttpService implements HttpInterface {
                         JSONObject obj = new JSONObject(body);
                         try {
                             HashSet<String> ids = getKeys(obj);
+                            if (ids.isEmpty())
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
                             //Delete stuff
                             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                             if (srvInterface.deleteAnalytics(ids))
@@ -457,6 +485,8 @@ public class HttpService implements HttpInterface {
                         JSONObject obj = new JSONObject(body);
                         try {
                             HashSet<String> ids = getKeys(obj);
+                            if (ids.isEmpty())
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
                             //Delete stuff
                             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                             if (srvInterface.deleteApp(ids))

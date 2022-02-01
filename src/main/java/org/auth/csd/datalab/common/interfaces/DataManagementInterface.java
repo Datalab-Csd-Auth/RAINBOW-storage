@@ -1,6 +1,7 @@
 package org.auth.csd.datalab.common.interfaces;
 
 import org.apache.ignite.services.Service;
+import org.auth.csd.datalab.common.Helpers;
 import org.auth.csd.datalab.common.models.InputJson;
 import org.auth.csd.datalab.common.models.Monitoring;
 import org.auth.csd.datalab.common.models.keys.AnalyticKey;
@@ -8,6 +9,7 @@ import org.auth.csd.datalab.common.models.keys.MetricKey;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
+import org.auth.csd.datalab.common.Helpers.Tuple2;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,7 +23,7 @@ public interface DataManagementInterface extends Service {
     void ingestMonitoring(HashMap<MetricKey, InputJson> metrics);
     HashMap<MetricKey, MetaMetric> extractMeta(HashMap<String, HashSet<String>> filter);
     HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to);
-    HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, int agg);
+    Tuple2<Double,Long> extractMonitoringSingle(HashMap<String, HashSet<String>> filter, Long from, Long to, int agg);
     Boolean deleteMonigoring(HashMap<String, HashSet<String>> filter);
 
     void ingestAnalytics(HashMap<AnalyticKey, Metric> data);
