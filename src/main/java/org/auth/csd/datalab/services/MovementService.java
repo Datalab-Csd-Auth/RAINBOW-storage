@@ -10,6 +10,8 @@ import org.auth.csd.datalab.common.interfaces.DataManagementInterface;
 import org.auth.csd.datalab.common.interfaces.MovementInterface;
 import org.auth.csd.datalab.common.models.InputJson;
 import org.auth.csd.datalab.common.models.Monitoring;
+import org.auth.csd.datalab.common.models.Replica;
+import org.auth.csd.datalab.common.models.ReplicaHost;
 import org.auth.csd.datalab.common.models.keys.MetricKey;
 import org.auth.csd.datalab.common.models.keys.ReplicaMetricKey;
 import org.auth.csd.datalab.common.models.keys.ReplicaMetricTimeKey;
@@ -28,12 +30,12 @@ public class MovementService implements MovementInterface {
 
     @IgniteInstanceResource
     private Ignite ignite;
+    private HashMap<String, Replica> localReplicas = null;
+    private HashMap<String, Replica> remoteReplicas = null;
     /**
      * Reference to the cache.
      */
-    private IgniteCache<ReplicaMetricKey, TimedMetric> myReplicaLatest;
-    private IgniteCache<ReplicaMetricTimeKey, Metric> myReplicaHistorical;
-    private IgniteCache<ReplicaMetricKey, MetaMetric> myReplicaMeta;
+    private IgniteCache<String, ReplicaHost> myReplicaHosts;
 
     @Override
     public void ingestMonitoring(HashMap<MetricKey, InputJson> metrics){
@@ -60,7 +62,7 @@ public class MovementService implements MovementInterface {
     }
 
     @Override
-    public Double extractMonitoringSingle(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList, int agg) {
+    public Double extractMonitoringQuery(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList, int agg) {
         Double tmpVal = (agg == 1) ? Double.MAX_VALUE : 0L;
         Helpers.Tuple2<Double, Long> finalTuple = new Tuple2<>(tmpVal,0L);
         //TODO Check if local node has remote data
@@ -70,7 +72,7 @@ public class MovementService implements MovementInterface {
             if(ignite.cluster().forServers().forHost(node).nodes().size() == 0) continue;
             HashMap<MetricKey, Monitoring> values;
             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forServers().forHost(node)).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
-            Tuple2<Double, Long> tmp = srvInterface.extractMonitoringSingle(filter, from, to, agg);
+            Tuple2<Double, Long> tmp = srvInterface.extractMonitoringQuery(filter, from, to, agg);
             finalTuple = combineTuples(finalTuple, tmp, agg);
         }
         if(finalTuple != null) {
@@ -104,9 +106,7 @@ public class MovementService implements MovementInterface {
     public void init(ServiceContext ctx) {
         System.out.println("Initializing Movement Service on node:" + ignite.cluster().localNode());
         //Get the cache that is designed in the config for the latest data
-        myReplicaLatest = ignite.cache(latestCacheName);
-        myReplicaHistorical = ignite.cache(historicalCacheName);
-        myReplicaMeta = ignite.cache(metaCacheName);
+        myReplicaHosts = ignite.cache(replicaHostCache);
     }
 
     @Override

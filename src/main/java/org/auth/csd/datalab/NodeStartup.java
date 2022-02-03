@@ -1,11 +1,9 @@
 package org.auth.csd.datalab;
 
-import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteException;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Objects;
 
 import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
 
@@ -16,7 +14,7 @@ public class NodeStartup {
 
     public static final String discoveryDelimiter = ",";
 
-    public static void main(String[] args) throws IgniteException, UnknownHostException, IgniteCheckedException {
+    public static void main(String[] args) throws IgniteException, UnknownHostException {
         //Get hostname
         String hostname = (readEnvVariable("HOSTNAME") != null) ? readEnvVariable("HOSTNAME") : InetAddress.getLocalHost().getHostName();
         //Get discovery servers

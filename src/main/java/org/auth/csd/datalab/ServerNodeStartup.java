@@ -10,6 +10,7 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
 import org.auth.csd.datalab.common.filter.HeadFilter;
 import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
+import org.auth.csd.datalab.common.models.ReplicaHost;
 import org.auth.csd.datalab.common.models.keys.*;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
@@ -21,7 +22,6 @@ import javax.cache.expiry.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
@@ -46,6 +46,7 @@ public class ServerNodeStartup {
     public static final String replicaLatestCacheName = "ReplicaLatestMonitoring";
     public static final String replicaHistoricalCacheName = "ReplicaHistoricalMonitoring";
     public static final String replicaMetaCacheName = "ReplicaMetaMonitoring";
+    public static final String replicaHostCache = "Replicas";
     //Optional application cache
     public static final String appCacheName = "ApplicationData";
     private static int evictionHours = 168;
@@ -59,7 +60,7 @@ public class ServerNodeStartup {
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(60000);
         localNode = hostname;
-        System.out.println("Local node id: " + localNode);
+        System.out.println("Local node: " + localNode);
     }
 
     private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
@@ -133,9 +134,14 @@ public class ServerNodeStartup {
                 .setDataRegionName(persistenceRegionName)
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
+        //Replica partitioned cache
+        CacheConfiguration<String, ReplicaHost> replicaHostsCfg = new CacheConfiguration<>(replicaHostCache);
+        historicalCfg.setCacheMode(CacheMode.PARTITIONED)
+                .setIndexedTypes(String.class, ReplicaHost.class)
+                .setBackups(1);
         //Optional application k-v cache
         if (app_cache) {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg,
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg, replicaHostsCfg,
                     new CacheConfiguration<AnalyticKey, Metric>(appCacheName)
                             .setCacheMode(CacheMode.LOCAL)
                             .setIndexedTypes(AnalyticKey.class, Metric.class)
@@ -143,7 +149,7 @@ public class ServerNodeStartup {
                             .setEagerTtl(true)
             );
         } else {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg);
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg, replicaHostsCfg);
         }
         //Activate services on nodes
         cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), rebalanceServiceConfiguration());

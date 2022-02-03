@@ -273,7 +273,7 @@ public class HttpService implements HttpInterface {
                             //Send stuff to movement service
                             MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
                             if (aggreg >= 0 && aggreg < 4) {
-                                Double data = srvInterface.extractMonitoringSingle(filters, from, to, nodesList, aggreg);
+                                Double data = srvInterface.extractMonitoringQuery(filters, from, to, nodesList, aggreg);
                                 return json(ctx, req.isKeepAlive.value, ("{\"value\": " + data + "}").getBytes());
                             } else
                                 return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Wrong aggregation!"));
@@ -447,7 +447,7 @@ public class HttpService implements HttpInterface {
                                 return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
                             //Delete stuff
                             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
-                            if (srvInterface.deleteMonigoring(filters))
+                            if (srvInterface.deleteMonitoring(filters))
                                 return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Delete successful!"));
                         } catch (Exception e) {
                             e.printStackTrace();

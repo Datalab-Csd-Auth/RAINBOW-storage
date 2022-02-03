@@ -9,9 +9,7 @@ import org.auth.csd.datalab.common.Helpers.Tuple2;
 import org.auth.csd.datalab.common.interfaces.DataManagementInterface;
 import org.auth.csd.datalab.common.models.InputJson;
 import org.auth.csd.datalab.common.models.Monitoring;
-import org.auth.csd.datalab.common.models.keys.AnalyticKey;
-import org.auth.csd.datalab.common.models.keys.MetricKey;
-import org.auth.csd.datalab.common.models.keys.MetricTimeKey;
+import org.auth.csd.datalab.common.models.keys.*;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
@@ -35,6 +33,9 @@ public class DataManagement implements DataManagementInterface {
     private static IgniteCache<MetricTimeKey, Metric> myHistorical;
     private static IgniteCache<MetricKey, MetaMetric> myMeta;
     private static IgniteCache<AnalyticKey, Metric> myAnalytics;
+    private IgniteCache<ReplicaMetricKey, TimedMetric> myReplicaLatest;
+    private IgniteCache<ReplicaMetricTimeKey, Metric> myReplicaHistorical;
+    private IgniteCache<ReplicaMetricKey, MetaMetric> myReplicaMeta;
     private static IgniteCache<AnalyticKey, Metric> myApp = null;
 
     //------------APP----------------
@@ -299,7 +300,7 @@ public class DataManagement implements DataManagementInterface {
         return result;
     }
 
-    private Tuple2<Double, Long> extractMonitoringData(MetricKey key, int agg) {
+    private Tuple2<Double, Long> extractMonitoringQuery(MetricKey key) {
         String select = "SELECT val ";
         String rest = "FROM TIMEDMETRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' ";
         // Iterate over the result set.
@@ -320,7 +321,7 @@ public class DataManagement implements DataManagementInterface {
         return null;
     }
 
-    private Tuple2<Double, Long> extractMonitoringData(MetricKey key, long from, int agg) {
+    private Tuple2<Double, Long> extractMonitoringQuery(MetricKey key, long from, int agg) {
         String select = "SELECT ";
         switch (agg) {
             case 0:
@@ -348,7 +349,7 @@ public class DataManagement implements DataManagementInterface {
         return null;
     }
 
-    private Tuple2<Double, Long> extractMonitoringData(MetricKey key, long from, long to, int agg) {
+    private Tuple2<Double, Long> extractMonitoringQuery(MetricKey key, long from, long to, int agg) {
         String select = "SELECT ";
         switch (agg) {
             case 0:
@@ -409,15 +410,15 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Extract monitoring data with aggregation
-    public Tuple2<Double, Long> extractMonitoringSingle(HashMap<String, HashSet<String>> filter, Long from, Long to, int agg) {
+    public Tuple2<Double, Long> extractMonitoringQuery(HashMap<String, HashSet<String>> filter, Long from, Long to, int agg) {
         Double tmpVal = (agg == 1) ? Double.MAX_VALUE : 0L;
         Tuple2<Double, Long> result = new Tuple2<>(tmpVal, 0L);
         HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
         for (MetricKey myKey : metaValues.keySet()) {
             Tuple2<Double, Long> tmp;
-            if (from < 0) tmp = extractMonitoringData(myKey, agg);
-            else if (to >= from) tmp = extractMonitoringData(myKey, from, to, agg);
-            else tmp = extractMonitoringData(myKey, from, agg);
+            if (from < 0) tmp = extractMonitoringQuery(myKey);
+            else if (to >= from) tmp = extractMonitoringQuery(myKey, from, to, agg);
+            else tmp = extractMonitoringQuery(myKey, from, agg);
             if(tmp != null){
                 result = combineTuples(result, tmp, agg);
             }
@@ -427,7 +428,7 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Delete monitoring data
-    public Boolean deleteMonigoring(HashMap<String, HashSet<String>> filter) {
+    public Boolean deleteMonitoring(HashMap<String, HashSet<String>> filter) {
         HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
         if (!metaValues.isEmpty()) {
             StringBuilder sql = new StringBuilder(" WHERE ");
@@ -448,6 +449,9 @@ public class DataManagement implements DataManagementInterface {
         myHistorical = ignite.cache(historicalCacheName);
         myMeta = ignite.cache(metaCacheName);
         myAnalytics = ignite.cache(analyticsCacheName);
+        myReplicaLatest = ignite.cache(replicaLatestCacheName);
+        myReplicaHistorical = ignite.cache(replicaHistoricalCacheName);
+        myReplicaMeta = ignite.cache(replicaMetaCacheName);
         if (app_cache) myApp = ignite.cache(appCacheName);
         System.out.println("Initializing Data Management on node:" + ignite.cluster().localNode());
     }
