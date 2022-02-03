@@ -446,8 +446,8 @@ public class HttpService implements HttpInterface {
                             if (filters.isEmpty())
                                 return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
                             //Delete stuff
-                            DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
-                            if (srvInterface.deleteMonitoring(filters))
+                            MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+                            if (srvInterface.deleteMonitoring(filters, new HashSet<>()))
                                 return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Delete successful!"));
                         } catch (Exception e) {
                             e.printStackTrace();

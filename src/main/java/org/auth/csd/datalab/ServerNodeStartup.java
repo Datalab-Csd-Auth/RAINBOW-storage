@@ -10,7 +10,6 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
 import org.auth.csd.datalab.common.filter.HeadFilter;
 import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
-import org.auth.csd.datalab.common.models.ReplicaHost;
 import org.auth.csd.datalab.common.models.keys.*;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
@@ -87,25 +86,29 @@ public class ServerNodeStartup {
         cfg.setDataStorageConfiguration(dataStorageConfiguration());
         //Cache configurations
         //Latest monitoring data cache
-        CacheConfiguration<MetricKey, TimedMetric> latestCfg = new CacheConfiguration<>(latestCacheName);
+        CacheConfiguration<HostMetricKey, TimedMetric> latestCfg = new CacheConfiguration<>(latestCacheName);
         latestCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(MetricKey.class, TimedMetric.class)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
-                .setEagerTtl(true);
-        //Metadata cache (metric meta)
-        CacheConfiguration<MetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
-        metaCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(MetricKey.class, MetaMetric.class)
-                .setDataRegionName(persistenceRegionName)
+                .setIndexedTypes(HostMetricKey.class, TimedMetric.class)
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
         //Historical monitoring data cache
-        CacheConfiguration<MetricTimeKey, Metric> historicalCfg = new CacheConfiguration<>(historicalCacheName);
+        CacheConfiguration<HostMetricTimeKey, Metric> historicalCfg = new CacheConfiguration<>(historicalCacheName);
         historicalCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(MetricTimeKey.class, Metric.class)
+                .setIndexedTypes(HostMetricTimeKey.class, Metric.class)
                 .setDataRegionName(persistenceRegionName)
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
+        //Metadata cache (metric meta)
+        //Create near cache for local reads
+        NearCacheConfiguration<HostMetricKey, MetaMetric> nearCfg = new NearCacheConfiguration<>();
+        nearCfg.setNearStartSize(50 * 1024 * 1024);
+        //Create meta cache with near configs
+        CacheConfiguration<HostMetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
+        metaCfg.setCacheMode(CacheMode.PARTITIONED)
+                .setIndexedTypes(HostMetricKey.class, MetaMetric.class)
+                .setBackups(1)
+                .setNearConfiguration(nearCfg)
+                .setDataRegionName(persistenceRegionName);
         //Analytics cache
         CacheConfiguration<AnalyticKey, Metric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
         analyticsCfg.setCacheMode(CacheMode.LOCAL)
@@ -113,35 +116,9 @@ public class ServerNodeStartup {
                 .setDataRegionName(persistenceRegionName)
                 .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
                 .setEagerTtl(true);
-        //Replica caches
-        //Replica Latest monitoring cache
-        CacheConfiguration<ReplicaMetricKey, TimedMetric> replicaLatestCfg = new CacheConfiguration<>(replicaLatestCacheName);
-        latestCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(ReplicaMetricKey.class, TimedMetric.class)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
-                .setEagerTtl(true);
-        //Replica Metadata cache (metric meta)
-        CacheConfiguration<ReplicaMetricKey, MetaMetric> replicaMetaCfg = new CacheConfiguration<>(replicaMetaCacheName);
-        metaCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(ReplicaMetricKey.class, MetaMetric.class)
-                .setDataRegionName(persistenceRegionName)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
-                .setEagerTtl(true);
-        //Replica Historical monitoring data cache
-        CacheConfiguration<ReplicaMetricTimeKey, Metric> replicaHistoricalCfg = new CacheConfiguration<>(replicaHistoricalCacheName);
-        historicalCfg.setCacheMode(CacheMode.LOCAL)
-                .setIndexedTypes(ReplicaMetricTimeKey.class, Metric.class)
-                .setDataRegionName(persistenceRegionName)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(new Duration(TimeUnit.HOURS, evictionHours)))
-                .setEagerTtl(true);
-        //Replica partitioned cache
-        CacheConfiguration<String, ReplicaHost> replicaHostsCfg = new CacheConfiguration<>(replicaHostCache);
-        historicalCfg.setCacheMode(CacheMode.PARTITIONED)
-                .setIndexedTypes(String.class, ReplicaHost.class)
-                .setBackups(1);
         //Optional application k-v cache
         if (app_cache) {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg, replicaHostsCfg,
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,
                     new CacheConfiguration<AnalyticKey, Metric>(appCacheName)
                             .setCacheMode(CacheMode.LOCAL)
                             .setIndexedTypes(AnalyticKey.class, Metric.class)
@@ -149,7 +126,7 @@ public class ServerNodeStartup {
                             .setEagerTtl(true)
             );
         } else {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg, replicaLatestCfg, replicaMetaCfg, replicaHistoricalCfg, replicaHostsCfg);
+            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);
         }
         //Activate services on nodes
         cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), rebalanceServiceConfiguration());

@@ -29,13 +29,10 @@ public class DataManagement implements DataManagementInterface {
     /**
      * Reference to the cache.
      */
-    private static IgniteCache<MetricKey, TimedMetric> myLatest;
-    private static IgniteCache<MetricTimeKey, Metric> myHistorical;
+    private static IgniteCache<HostMetricKey, TimedMetric> myLatest;
+    private static IgniteCache<HostMetricTimeKey, Metric> myHistorical;
     private static IgniteCache<MetricKey, MetaMetric> myMeta;
     private static IgniteCache<AnalyticKey, Metric> myAnalytics;
-    private IgniteCache<ReplicaMetricKey, TimedMetric> myReplicaLatest;
-    private IgniteCache<ReplicaMetricTimeKey, Metric> myReplicaHistorical;
-    private IgniteCache<ReplicaMetricKey, MetaMetric> myReplicaMeta;
     private static IgniteCache<AnalyticKey, Metric> myApp = null;
 
     //------------APP----------------
@@ -222,42 +219,11 @@ public class DataManagement implements DataManagementInterface {
     }
 
     //------------MONITORING----------------
-    private HashMap<MetricKey, MetaMetric> extractMetaData(HashMap<String, HashSet<String>> ids) {
-        String select = "SELECT metricID, entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter, podUUID, podName, podNamespace, containerID, containerName ";
-        String from = "FROM METAMETRIC ";
-        List<String> where = new ArrayList<>();
-        HashMap<MetricKey, MetaMetric> result = new HashMap<>();
-        if (!ids.isEmpty()) {
-            for (Map.Entry<String, HashSet<String>> entry : ids.entrySet()) {
-                List<String> tmpWhere = new ArrayList<>();
-                List<String> wildcard = entry.getValue().stream().filter(el -> el.endsWith("%")).collect(Collectors.toList());
-                List<String> exact = new ArrayList<>(entry.getValue());
-                exact.removeAll(wildcard);
-                if (!exact.isEmpty())
-                    tmpWhere.add(entry.getKey() + " IN ('" + String.join("','", entry.getValue()) + "') ");
-                for (String key : wildcard) {
-                    tmpWhere.add(entry.getKey() + " LIKE '" + key + "' ");
-                }
-                where.add("(" + String.join(") OR (", tmpWhere) + ")");
-            }
-        }
-        String finalWhere = (!where.isEmpty()) ? " WHERE (" + String.join(") AND (", where) + ") " : "";
-        try (QueryCursor<List<?>> cursor = getQueryValues(myMeta, select + from + finalWhere)) {
-            for (List<?> row : cursor) {
-                MetricKey key = new MetricKey(row.get(0).toString(), row.get(1).toString());
-                MetaMetric value = new MetaMetric(row.get(2).toString(), row.get(3).toString(), row.get(4).toString(), row.get(5).toString(),
-                        row.get(6).toString(), (double) row.get(7), (double) row.get(8), (boolean) row.get(9),
-                        row.get(10).toString(), row.get(11).toString(), row.get(12).toString(), row.get(13).toString(),
-                        row.get(14).toString());
-                result.put(key, value);
-            }
-        }
-        return result;
-    }
-
-    private List<TimedMetric> extractMonitoringData(MetricKey key) {
+    private List<TimedMetric> extractMonitoringData(HostMetricKey key) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT timestamp, val FROM TIMEDMETRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "'";
+        String sql = "SELECT timestamp, val " +
+                "FROM TIMEDMETRIC " +
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "'";
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myLatest, sql)) {
             for (List<?> row : cursor)
@@ -267,8 +233,9 @@ public class DataManagement implements DataManagementInterface {
         if (result.isEmpty()) {
             sql = "SELECT a.timestamp, a.val " +
                     "FROM METRIC AS a " +
-                    "INNER JOIN (SELECT metricID, entityID, MAX(timestamp) as timestamp FROM METRIC GROUP BY (metricID, entityID)) AS b ON a.metricID = b.metricID AND a.timestamp = b.timestamp AND a.entityID = b.entityID " +
-                    "WHERE a.metricID = '" + key.metricID + "' AND a.entityID = '" + key.entityID + "'";
+                    "INNER JOIN (SELECT metricID, entityID, hostname, MAX(timestamp) as timestamp FROM METRIC GROUP BY (metricID, entityID, hostname)) AS b " +
+                    "ON a.metricID = b.metricID AND a.timestamp = b.timestamp AND a.entityID = b.entityID AND a.hostname = b.hostname " +
+                    "WHERE a.metricID = '" + key.metric.metricID + "' AND a.entityID = '" + key.metric.entityID + "' AND a.hostname = '" + key.hostname + "'";
             // Iterate over the result set.
             try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
                 for (List<?> row : cursor)
@@ -278,9 +245,11 @@ public class DataManagement implements DataManagementInterface {
         return result;
     }
 
-    private List<TimedMetric> extractMonitoringData(MetricKey key, long from) {
+    private List<TimedMetric> extractMonitoringData(HostMetricKey key, long from) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT timestamp, val FROM METRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' AND timestamp >= " + from;
+        String sql = "SELECT timestamp, val " +
+                "FROM METRIC " +
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp >= " + from;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
             for (List<?> row : cursor)
@@ -289,9 +258,11 @@ public class DataManagement implements DataManagementInterface {
         return result;
     }
 
-    private List<TimedMetric> extractMonitoringData(MetricKey key, long from, long to) {
+    private List<TimedMetric> extractMonitoringData(HostMetricKey key, long from, long to) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT timestamp, val FROM METRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' AND timestamp BETWEEN " + from + " AND " + to;
+        String sql = "SELECT timestamp, val " +
+                "FROM METRIC " +
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp BETWEEN " + from + " AND " + to;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
             for (List<?> row : cursor)
@@ -300,19 +271,21 @@ public class DataManagement implements DataManagementInterface {
         return result;
     }
 
-    private Tuple2<Double, Long> extractMonitoringQuery(MetricKey key) {
-        String select = "SELECT val ";
-        String rest = "FROM TIMEDMETRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' ";
+    private Tuple2<Double, Long> extractMonitoringQuery(HostMetricKey key) {
+        String sql = "SELECT val " +
+                "FROM TIMEDMETRIC " +
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "'";
         // Iterate over the result set.
-        try (QueryCursor<List<?>> cursor = getQueryValues(myLatest, select + rest)) {
+        try (QueryCursor<List<?>> cursor = getQueryValues(myLatest, sql)) {
             for (List<?> row : cursor)
                 return new Tuple2<>((Double) row.get(0), 1L);
         }
         //If main memory cache is empty (due to restart){
-        String sql = "SELECT a.val " +
+        sql = "SELECT a.val " +
                 "FROM METRIC AS a " +
-                "INNER JOIN (SELECT metricID, entityID, MAX(timestamp) as timestamp FROM METRIC GROUP BY (metricID, entityID)) AS b ON a.metricID = b.metricID AND a.timestamp = b.timestamp AND a.entityID = b.entityID " +
-                "WHERE a.metricID = '" + key.metricID + "' AND a.entityID = '" + key.entityID + "'";
+                "INNER JOIN (SELECT metricID, entityID, hostname, MAX(timestamp) as timestamp FROM METRIC GROUP BY (metricID, entityID, hostname)) AS b " +
+                "ON a.metricID = b.metricID AND a.timestamp = b.timestamp AND a.entityID = b.entityID AND a.hostname = b.hostname " +
+                "WHERE a.metricID = '" + key.metric.metricID + "' AND a.entityID = '" + key.metric.entityID + "' AND a.hostname = '" + key.hostname + "'";
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
             for (List<?> row : cursor)
@@ -321,7 +294,7 @@ public class DataManagement implements DataManagementInterface {
         return null;
     }
 
-    private Tuple2<Double, Long> extractMonitoringQuery(MetricKey key, long from, int agg) {
+    private Tuple2<Double, Long> extractMonitoringQuery(HostMetricKey key, long from, int agg) {
         String select = "SELECT ";
         switch (agg) {
             case 0:
@@ -337,7 +310,8 @@ public class DataManagement implements DataManagementInterface {
                 select += "SUM(val), COUNT(val) ";
                 break;
         }
-        String rest = "FROM METRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' AND timestamp >= " + from + " ";
+        String rest = "FROM METRIC " +
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp >= " + from;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, select + rest)) {
             for (List<?> row : cursor)
@@ -349,7 +323,7 @@ public class DataManagement implements DataManagementInterface {
         return null;
     }
 
-    private Tuple2<Double, Long> extractMonitoringQuery(MetricKey key, long from, long to, int agg) {
+    private Tuple2<Double, Long> extractMonitoringQuery(HostMetricKey key, long from, long to, int agg) {
         String select = "SELECT ";
         switch (agg) {
             case 0:
@@ -365,7 +339,8 @@ public class DataManagement implements DataManagementInterface {
                 select += "SUM(val), COUNT(val) ";
                 break;
         }
-        String rest = "FROM METRIC WHERE metricID = '" + key.metricID + "' AND entityID = '" + key.entityID + "' AND timestamp BETWEEN " + from + " AND " + to;
+        String rest = "FROM METRIC " +
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp BETWEEN " + from + " AND " + to;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, select + rest)) {
             for (List<?> row : cursor)
@@ -381,40 +356,31 @@ public class DataManagement implements DataManagementInterface {
     //Ingest new monitoring data
     public void ingestMonitoring(HashMap<MetricKey, InputJson> metrics) {
         for (Map.Entry<MetricKey, InputJson> entry : metrics.entrySet()) {
-            myMeta.put(entry.getKey(), new MetaMetric(entry.getValue()));
-            myLatest.put(entry.getKey(), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
-            myHistorical.put(new MetricTimeKey(entry.getValue()), new Metric(entry.getValue().val));
+            myLatest.put(new HostMetricKey(entry.getKey(),localNode), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
+            myHistorical.put(new HostMetricTimeKey(entry.getValue(), localNode), new Metric(entry.getValue().val));
         }
     }
 
     @Override
-    //Extract only meta data
-    public HashMap<MetricKey, MetaMetric> extractMeta(HashMap<String, HashSet<String>> filter) {
-        return extractMetaData(filter);
-    }
-
-    @Override
     //Extract monitoring data
-    public HashMap<MetricKey, Monitoring> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to) {
-        HashMap<MetricKey, Monitoring> result = new HashMap<>();
-        HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
-        for (MetricKey myKey : metaValues.keySet()) {
+    public HashMap<HostMetricKey, List<TimedMetric>> extractMonitoring(Set<HostMetricKey> keys, Long from, Long to) {
+        HashMap<HostMetricKey, List<TimedMetric>> result = new HashMap<>();
+        for (HostMetricKey myKey : keys) {
             List<TimedMetric> data;
             if (from < 0) data = extractMonitoringData(myKey);
             else if (to >= from) data = extractMonitoringData(myKey, from, to);
             else data = extractMonitoringData(myKey, from);
-            result.put(myKey, new Monitoring(metaValues.get(myKey), data));
+            result.put(myKey, data);
         }
         return result;
     }
 
     @Override
     //Extract monitoring data with aggregation
-    public Tuple2<Double, Long> extractMonitoringQuery(HashMap<String, HashSet<String>> filter, Long from, Long to, int agg) {
+    public Tuple2<Double, Long> extractMonitoringQuery(Set<HostMetricKey> keys, Long from, Long to, int agg) {
         Double tmpVal = (agg == 1) ? Double.MAX_VALUE : 0L;
         Tuple2<Double, Long> result = new Tuple2<>(tmpVal, 0L);
-        HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
-        for (MetricKey myKey : metaValues.keySet()) {
+        for (HostMetricKey myKey : keys) {
             Tuple2<Double, Long> tmp;
             if (from < 0) tmp = extractMonitoringQuery(myKey);
             else if (to >= from) tmp = extractMonitoringQuery(myKey, from, to, agg);
@@ -428,15 +394,15 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Delete monitoring data
-    public Boolean deleteMonitoring(HashMap<String, HashSet<String>> filter) {
-        HashMap<MetricKey, MetaMetric> metaValues = extractMetaData(filter);
-        if (!metaValues.isEmpty()) {
+    public Boolean deleteMonitoring(Set<HostMetricKey> keys) {
+        if (!keys.isEmpty()) {
             StringBuilder sql = new StringBuilder(" WHERE ");
-            metaValues.keySet().forEach((k -> sql.append(" (metricID = '").append(k.metricID).append("' AND entityID = '").append(k.entityID).append("') OR")));
+            keys.forEach((k -> sql.append(" (metricID = '").append(k.metric.metricID)
+                    .append("' AND entityID = '").append(k.metric.entityID)
+                    .append("' AND hostname = '").append(k.hostname).append("') OR")));
             sql.delete(sql.length() - 2, sql.length());
             getQueryValues(myHistorical, "DELETE FROM METRIC " + sql);
             getQueryValues(myLatest, "DELETE FROM TIMEDMETRIC " + sql);
-            getQueryValues(myMeta, "DELETE FROM METAMETRIC " + sql);
             return true;
         } else return false;
     }
@@ -449,9 +415,6 @@ public class DataManagement implements DataManagementInterface {
         myHistorical = ignite.cache(historicalCacheName);
         myMeta = ignite.cache(metaCacheName);
         myAnalytics = ignite.cache(analyticsCacheName);
-        myReplicaLatest = ignite.cache(replicaLatestCacheName);
-        myReplicaHistorical = ignite.cache(replicaHistoricalCacheName);
-        myReplicaMeta = ignite.cache(replicaMetaCacheName);
         if (app_cache) myApp = ignite.cache(appCacheName);
         System.out.println("Initializing Data Management on node:" + ignite.cluster().localNode());
     }
