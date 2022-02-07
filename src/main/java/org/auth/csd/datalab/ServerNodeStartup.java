@@ -20,6 +20,7 @@ import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -42,9 +43,6 @@ public class ServerNodeStartup {
     //Local consistent id
     public static String localNode = null;
     //Replicas monitoring caches
-    public static final String replicaLatestCacheName = "ReplicaLatestMonitoring";
-    public static final String replicaHistoricalCacheName = "ReplicaHistoricalMonitoring";
-    public static final String replicaMetaCacheName = "ReplicaMetaMonitoring";
     public static final String replicaHostCache = "Replicas";
     //Optional application cache
     public static final String appCacheName = "ApplicationData";
@@ -109,6 +107,12 @@ public class ServerNodeStartup {
                 .setBackups(1)
                 .setNearConfiguration(nearCfg)
                 .setDataRegionName(persistenceRegionName);
+        //Create replicas cache
+        CacheConfiguration<HostMetricKey, List<String>> replicaCfg = new CacheConfiguration<>(replicaHostCache);
+        replicaCfg.setCacheMode(CacheMode.PARTITIONED)
+                .setIndexedTypes(HostMetricKey.class, List.class)
+                .setBackups(1)
+                .setDataRegionName(persistenceRegionName);
         //Analytics cache
         CacheConfiguration<AnalyticKey, Metric> analyticsCfg = new CacheConfiguration<>(analyticsCacheName);
         analyticsCfg.setCacheMode(CacheMode.LOCAL)
@@ -118,7 +122,7 @@ public class ServerNodeStartup {
                 .setEagerTtl(true);
         //Optional application k-v cache
         if (app_cache) {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg,
+            cfg.setCacheConfiguration(latestCfg, historicalCfg, metaCfg, replicaCfg, analyticsCfg,
                     new CacheConfiguration<AnalyticKey, Metric>(appCacheName)
                             .setCacheMode(CacheMode.LOCAL)
                             .setIndexedTypes(AnalyticKey.class, Metric.class)
@@ -126,7 +130,7 @@ public class ServerNodeStartup {
                             .setEagerTtl(true)
             );
         } else {
-            cfg.setCacheConfiguration(latestCfg, metaCfg, historicalCfg, analyticsCfg);
+            cfg.setCacheConfiguration(latestCfg, historicalCfg, metaCfg, replicaCfg, analyticsCfg);
         }
         //Activate services on nodes
         cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), rebalanceServiceConfiguration());

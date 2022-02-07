@@ -8,14 +8,12 @@ import org.apache.ignite.services.ServiceContext;
 import org.auth.csd.datalab.common.Helpers.Tuple2;
 import org.auth.csd.datalab.common.interfaces.DataManagementInterface;
 import org.auth.csd.datalab.common.models.InputJson;
-import org.auth.csd.datalab.common.models.Monitoring;
 import org.auth.csd.datalab.common.models.keys.*;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static org.auth.csd.datalab.ServerNodeStartup.*;
 import static org.auth.csd.datalab.ServerNodeStartup.appCacheName;
@@ -31,7 +29,6 @@ public class DataManagement implements DataManagementInterface {
      */
     private static IgniteCache<HostMetricKey, TimedMetric> myLatest;
     private static IgniteCache<HostMetricTimeKey, Metric> myHistorical;
-    private static IgniteCache<MetricKey, MetaMetric> myMeta;
     private static IgniteCache<AnalyticKey, Metric> myAnalytics;
     private static IgniteCache<AnalyticKey, Metric> myApp = null;
 
@@ -354,10 +351,10 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Ingest new monitoring data
-    public void ingestMonitoring(HashMap<MetricKey, InputJson> metrics) {
+    public void ingestMonitoring(HashMap<MetricKey, InputJson> metrics, String hostname) {
         for (Map.Entry<MetricKey, InputJson> entry : metrics.entrySet()) {
-            myLatest.put(new HostMetricKey(entry.getKey(),localNode), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
-            myHistorical.put(new HostMetricTimeKey(entry.getValue(), localNode), new Metric(entry.getValue().val));
+            myLatest.put(new HostMetricKey(entry.getKey(),hostname), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
+            myHistorical.put(new HostMetricTimeKey(entry.getValue(), hostname), new Metric(entry.getValue().val));
         }
     }
 
@@ -413,7 +410,6 @@ public class DataManagement implements DataManagementInterface {
         //Get the cache that is designed in the config for the latest data
         myLatest = ignite.cache(latestCacheName);
         myHistorical = ignite.cache(historicalCacheName);
-        myMeta = ignite.cache(metaCacheName);
         myAnalytics = ignite.cache(analyticsCacheName);
         if (app_cache) myApp = ignite.cache(appCacheName);
         System.out.println("Initializing Data Management on node:" + ignite.cluster().localNode());

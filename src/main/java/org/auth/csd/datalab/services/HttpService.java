@@ -45,24 +45,15 @@ public class HttpService implements HttpInterface {
 
     private Server server;
 
-    /**
-     * {@inheritDoc}
-     */
     public void init(ServiceContext ctx) {
         server = new CustomHttpServer().listen(50000);
         System.out.println("Initializing Http Server on node:" + ignite.cluster().localNode());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public void execute(ServiceContext ctx) {
         System.out.println("Executing Http Server on node:" + ignite.cluster().localNode());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public void cancel(ServiceContext ctx) {
         System.out.println("Stopping Http Server on node:" + ignite.cluster().localNode());
         server.shutdown();

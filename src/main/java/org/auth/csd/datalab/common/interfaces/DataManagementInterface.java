@@ -18,7 +18,7 @@ public interface DataManagementInterface extends Service {
     /** Service name */
     public static final String SERVICE_NAME = "DataManagementService";
 
-    void ingestMonitoring(HashMap<MetricKey, InputJson> metrics);
+    void ingestMonitoring(HashMap<MetricKey, InputJson> metrics, String hostname);
     HashMap<HostMetricKey, List<TimedMetric>> extractMonitoring(Set<HostMetricKey> keys, Long from, Long to);
     Tuple2<Double,Long> extractMonitoringQuery(Set<HostMetricKey> keys, Long from, Long to, int agg);
     Boolean deleteMonitoring(Set<HostMetricKey> keys);
