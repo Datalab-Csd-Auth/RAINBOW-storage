@@ -17,9 +17,9 @@ import org.auth.csd.datalab.common.models.keys.HostMetricKey;
 import org.auth.csd.datalab.common.models.keys.MetricKey;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.Helpers.Tuple2;
-import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 
+import javax.cache.Cache;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -93,9 +93,90 @@ public class MovementService implements MovementInterface {
         replicas.forEach((k,v) -> {
             if(ignite.cluster().forServers().forHost(k).nodes().size() > 0){
                 DataManagementInterface tmpInterface = ignite.services(ignite.cluster().forServers().forHost(k)).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
-                tmpInterface.ingestMonitoring(v, k);
+                tmpInterface.ingestMonitoring(v, localNode);
             }
         });
+    }
+
+    private HashMap<String, HashSet<HostMetricKey>> getReplicaSet(Set<HostMetricKey> metrics){
+        //Store the final set of metrics per node
+        HashMap<String, HashSet<HostMetricKey>> finalSet =  new HashMap<>();
+        //Tmp sets for storing
+        HashMap<String, HashSet<HostMetricKey>> metricsPerNode =  new HashMap<>();
+        HashSet<String> notedNodes = new HashSet<>();
+        for(HostMetricKey key : metrics){
+            //If the metric is local then continue without checking replicas
+            if(key.hostname.equals(localNode)) {
+                //Add the hostname to the list
+                notedNodes.add(localNode);
+                HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(localNode, new HashSet<>());
+                tmp.add(key);
+                metricsPerNode.put(localNode, tmp);
+                continue;
+            }
+            //Get replicas
+            List<String> tmpReplicas = myReplica.get(key);
+            //If replicas contain the local node, get just that
+            if(tmpReplicas != null && tmpReplicas.contains(localNode)) {
+                //Add the hostname to the list
+                notedNodes.add(localNode);
+                HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(localNode, new HashSet<>());
+                tmp.add(key);
+                metricsPerNode.put(localNode, tmp);
+                continue;
+            }
+            //If there are no replicas then it is a special case and the host of the key needs to be included in the necessary nodes
+            if(tmpReplicas == null) notedNodes.add(key.hostname);
+            else { //In every other case store all replicas and host
+                tmpReplicas.forEach(k -> {
+                    HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(k, new HashSet<>());
+                    tmp.add(key);
+                    metricsPerNode.put(k, tmp);
+                });
+            }
+            HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(key.hostname, new HashSet<>());
+            tmp.add(key);
+            metricsPerNode.put(key.hostname, tmp);
+        }
+        //If the localnode is part of the solution then immediately add it to the final set
+        if(metricsPerNode.containsKey(localNode)) {
+            finalSet.put(localNode, metricsPerNode.get(localNode));
+            metricsPerNode.remove(localNode);
+        }
+        //Same with every noted node
+        notedNodes.forEach(k -> {
+            if(metricsPerNode.containsKey(k)){
+                //Add it to the final set
+                finalSet.put(k, metricsPerNode.get(k));
+                //Remove it from the tmp map
+                metricsPerNode.remove(k);
+                //Remove elements from the rest of the nodes
+                metricsPerNode.forEach((key,v) -> v.removeAll(finalSet.get(k)));
+            }
+        });
+        while(!metricsPerNode.isEmpty()){
+            //Find the entry with the max number of metrics
+            Map.Entry<String, HashSet<HostMetricKey>> maxEntry = null;
+            for (Map.Entry<String, HashSet<HostMetricKey>> entry : metricsPerNode.entrySet())
+            {
+                if (maxEntry == null || entry.getValue().size() > maxEntry.getValue().size())
+                {
+                    maxEntry = entry;
+                }
+            }
+            if(maxEntry.getValue().size() == 0) {
+                break;
+            }
+            //Then remove its elements from every other node
+            //Add it to the final set
+            finalSet.put(maxEntry.getKey(), maxEntry.getValue());
+            //Remove it from the tmp map
+            metricsPerNode.remove(maxEntry.getKey());
+            //Remove elements from the rest of the nodes
+            Map.Entry<String, HashSet<HostMetricKey>> finalMaxEntry = maxEntry;
+            metricsPerNode.forEach((key, v) -> v.removeAll(finalMaxEntry.getValue()));
+        }
+        return finalSet;
     }
 
     @Override
@@ -126,48 +207,15 @@ public class MovementService implements MovementInterface {
         }else{
             //Get the meta queried
             HashMap<HostMetricKey, MetaMetric> meta = extractMetaData(filter, nodeList.toArray(new String[0]));
-            HashMap<String, HashSet<HostMetricKey>> metricsPerNode =  new HashMap<>();
-            HashSet<String> notedNodes = new HashSet<>();
-            for(HostMetricKey key : meta.keySet()){
-                //If the metric is local then continue without checking replicas
-                if(key.hostname.equals(localNode)) {
-                    //Add the hostname to the list
-                    notedNodes.add(localNode);
-                    HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(localNode, new HashSet<>());
-                    tmp.add(key);
-                    metricsPerNode.put(localNode, tmp);
-                    continue;
+            HashMap<String, HashSet<HostMetricKey>> nodeSet = getReplicaSet(meta.keySet());
+            for (String node: nodeSet.keySet()){
+                if(ignite.cluster().forServers().forHost(node).nodes().size() > 0){
+                    DataManagementInterface srvInterface = ignite.services(ignite.cluster().forServers().forHost(node)).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
+                    HashMap<HostMetricKey, List<TimedMetric>> values = srvInterface.extractMonitoring(nodeSet.get(node), from, to);
+                    //TODO return stuff
                 }
-                //Get replicas
-                List<String> tmpReplicas = myReplica.get(key);
-                //If replicas contain the local node, get just that
-                if(tmpReplicas != null && tmpReplicas.contains(localNode)) {
-                    //Add the hostname to the list
-                    notedNodes.add(localNode);
-                    HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(localNode, new HashSet<>());
-                    tmp.add(key);
-                    metricsPerNode.put(localNode, tmp);
-                    continue;
-                }
-                //If there are no replicas then it is a special case and the host of the key needs to be included
-                if(tmpReplicas == null) notedNodes.add(key.hostname);
-                else { //In every other case store all replicas and host
-                    tmpReplicas.forEach(k -> {
-                        HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(k, new HashSet<>());
-                        tmp.add(key);
-                        metricsPerNode.put(k, tmp);
-                    });
-                }
-                HashSet<HostMetricKey> tmp = metricsPerNode.getOrDefault(key.hostname, new HashSet<>());
-                tmp.add(key);
-                metricsPerNode.put(key.hostname, tmp);
             }
-            System.out.println(notedNodes);
-            System.out.println(metricsPerNode);
-            //After finding the node - metrics lists continue until the minimum set is found. (start by checking the ones with the biggest lists)
-            //Start with the noted nodes and exclude their data from the other nodes
         }
-
         return result;
     }
 
@@ -246,18 +294,63 @@ public class MovementService implements MovementInterface {
         //Get the cache that is designed in the config for the latest data
         myMeta = ignite.cache(metaCacheName);
         myReplica = ignite.cache(replicaHostCache);
-        HostMetricKey test1 = new HostMetricKey("metr1", "as1", "puma.csd.auth.gr");
-        ArrayList<String> test = new ArrayList<>();
-        test.add("datalab-toliopoulos.csd.auth.gr");
-        myReplica.put(test1, test);
+//        String hostlocal = "puma.csd.auth.gr";
+//        String host1 = "test1.csd.auth.gr";
+//        String host2 = "test2.csd.auth.gr";
+//        String host3 = "test3.csd.auth.gr";
+//        String host4 = "test4.csd.auth.gr";
+//        String host5 = "test5.csd.auth.gr";
+//        String host6 = "test6.csd.auth.gr";
+//        HostMetricKey test1 = new HostMetricKey("metr1", "as1", host6);
+//        HostMetricKey test2 = new HostMetricKey("metr1", "as2", host6);
+//        HostMetricKey test3 = new HostMetricKey("metr2", "as1", host1);
+//        HostMetricKey test4 = new HostMetricKey("metr2", "as2", host6);
+//        ArrayList<String> listtest = new ArrayList<>();
+//        listtest.add(host1);
+//        listtest.add(host2);
+//        listtest.add(host4);
+//        myReplica.put(test1, listtest);
+//        listtest.clear();
+//        listtest.add(host2);
+//        listtest.add(host3);
+//        listtest.add(host4);
+//        myReplica.put(test2, listtest);
+////        listtest.clear();
+////        listtest.add(host1);
+////        listtest.add(host3);
+////        myReplica.put(test3, listtest);
+//        listtest.clear();
+//        listtest.add(host5);
+//        myReplica.put(test4, listtest);
+//
+//        MetaMetric metatest = new MetaMetric("","","","","",5,5,true,"","","","","");
+//        myMeta.put(test1, metatest);
+//        myMeta.put(test2, metatest);
+//        myMeta.put(test3, metatest);
+//        myMeta.put(test4, metatest);
     }
 
     @Override
     public void execute(ServiceContext ctx) {
         System.out.println("Executing Movement Service on node:" + ignite.cluster().localNode());
         //Check if replication is needed after a restart
-        IgniteBiPredicate<HostMetricKey, List<Object>> filter = (key, val) -> Objects.equals(key.hostname, localNode);
-        if(myReplica.query(new ScanQuery<>(filter)).getAll().size() > 0) replicate = true;
+        //For some reason filter does not work
+        IgniteBiPredicate<HostMetricKey, List<String>> filter = (key, val) -> {
+            System.out.println(key.hostname);
+            System.out.println(key.hostname.equals(localNode));
+            System.out.println(Objects.equals(key.hostname, localNode));
+            return Objects.equals(key.hostname, localNode);
+        };
+        //So we go with a full scan query
+        try (QueryCursor<Cache.Entry<HostMetricKey, List<String>>> qryCursor = myReplica.query(new ScanQuery<>())) {
+            for (Cache.Entry<HostMetricKey, List<String>> entry: qryCursor.getAll()){
+                if(entry.getKey().hostname.equals(localNode)){
+                    replicate = true;
+                    break;
+                }
+            }
+        }
+        System.out.println(replicate);
     }
 
     @Override

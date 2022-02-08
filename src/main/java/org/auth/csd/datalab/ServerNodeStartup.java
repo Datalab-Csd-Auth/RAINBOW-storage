@@ -52,11 +52,11 @@ public class ServerNodeStartup {
     private static final String persistenceRegionName = "Persistent_Region";
 
     public static void createServer(String discovery, String hostname) throws IgniteException {
+        localNode = hostname;
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(60000);
-        localNode = hostname;
         System.out.println("Local node: " + localNode);
     }
 
