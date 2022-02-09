@@ -12,6 +12,7 @@ import org.auth.csd.datalab.common.models.InputJson;
 import org.auth.csd.datalab.common.models.Message;
 import org.auth.csd.datalab.common.models.Monitoring;
 import org.auth.csd.datalab.common.models.keys.AnalyticKey;
+import org.auth.csd.datalab.common.models.keys.HostMetricKey;
 import org.auth.csd.datalab.common.models.keys.MetricKey;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
@@ -285,6 +286,8 @@ public class HttpService implements HttpInterface {
                         try {
                             //Get filters
                             HashMap<String, HashSet<String>> filters = getFilters(obj);
+                            //Get nodes
+                            HashSet<String> nodesList = getNodes(obj);
                             //Get return fields
                             HashSet<String> returns = new HashSet<>();
                             if (obj.has("fields")) { //Get data from the cluster
@@ -293,7 +296,7 @@ public class HttpService implements HttpInterface {
                             }
                             //Get Data
                             MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
-                            HashMap<MetricKey, MetaMetric> metricData = srvInterface.extractMonitoringList(filters);
+                            HashMap<HostMetricKey, MetaMetric> metricData = srvInterface.extractMonitoringList(filters, nodesList);
                             if (!metricData.isEmpty()) {
                                 metricData.forEach((k, v) -> result.append("{").append(k).append(",").append((returns.isEmpty()) ? v : v.toString(returns)).append("},"));
                                 result.deleteCharAt(result.length() - 1);

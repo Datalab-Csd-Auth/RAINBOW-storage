@@ -351,6 +351,16 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Ingest new monitoring data
+    public void ingestHistoricalMonitoring(HashMap<HostMetricKey, List<TimedMetric>> values) {
+        for (Map.Entry<HostMetricKey, List<TimedMetric>> entry : values.entrySet()) {
+            HashMap<HostMetricTimeKey, Metric> tmp = new HashMap<>();
+            entry.getValue().forEach(k -> tmp.put(new HostMetricTimeKey(entry.getKey(), k.timestamp), new Metric(k.val)));
+            myHistorical.putAll(tmp);
+        }
+    }
+
+    @Override
+    //Ingest historical monitoring data
     public void ingestMonitoring(HashMap<MetricKey, InputJson> metrics, String hostname) {
         for (Map.Entry<MetricKey, InputJson> entry : metrics.entrySet()) {
             myLatest.put(new HostMetricKey(entry.getKey(),hostname), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
