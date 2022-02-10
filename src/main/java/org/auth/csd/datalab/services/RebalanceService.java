@@ -7,59 +7,52 @@ import org.apache.ignite.lang.IgniteBiPredicate;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
 import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
+import org.auth.csd.datalab.common.models.keys.HostMetricKey;
+import org.auth.csd.datalab.common.models.values.MetaMetric;
 
 import java.util.*;
 
+import static org.auth.csd.datalab.ServerNodeStartup.metaCacheName;
+import static org.auth.csd.datalab.ServerNodeStartup.replicaHostCache;
+
 public class RebalanceService implements RebalanceInterface {
 
-//    //TODO ENV variables
-//    private String monName = "Monitoring";
-//    private String metaName = "Metadata";
+
     @IgniteInstanceResource
     private Ignite ignite;
 //    /** Reference to the cache. */
-//    private IgniteCache<String, String> metaCache;
-//    private IgniteCache<String, Object> monCache;
-//    private String delimiter = ".";
-    /**
-     * TODO node can have 1 status."
-     * status = 0, normal state
-     * status = 1, replicated state
-     * status = 2, partitioned state
-     */
-    private short state = 0;
-    /**
-     * Filter for partitioning
-     */
-    private String localFilter = null;
-    /**
-     * TODO can be replicated/partitioned to one node
-     */
-    UUID externalNode = null;
-    UUID localNode = null;
+    private static IgniteCache<HostMetricKey, MetaMetric> myMeta;
+    private static IgniteCache<HostMetricKey, List<String>> myReplica;
 
-    /** {@inheritDoc} */
-    //TODO work with consistent id
-    public void init(ServiceContext ctx) throws Exception {
+    public void init(ServiceContext ctx) {
         System.out.println("Initializing Rebalance Service on node:" + ignite.cluster().localNode());
-        /**
-         * It's assumed that the cache has already been deployed. To do that, make sure to start Data Nodes with
-         * a respective cache configuration.
-         */
-//        metaCache = ignite.cache(metaName);
-//        monCache = ignite.cache(monName);
-//        localNode = ignite.cluster().localNode().id();
-//        metaCache.put(localNode.toString() + delimiter + "local", localNode.toString());
+        //Get the cache that is designed in the config for the latest data
+        myMeta = ignite.cache(metaCacheName);
+        myReplica = ignite.cache(replicaHostCache);
     }
 
-    /** {@inheritDoc} */
-    public void execute(ServiceContext ctx) throws Exception {
+    public void execute(ServiceContext ctx) {
         System.out.println("Executing Rebalance Service on node:" + ignite.cluster().localNode());
+        //Every X time period execute the rebalance method (maybe streaming outlier detection)?
+
     }
 
-    /** {@inheritDoc} */
     public void cancel(ServiceContext ctx) {
         System.out.println("Stopping Rebalance Service on node:" + ignite.cluster().localNode());
+    }
+
+    //TODO make 2 requests so that external services can replicate stuff (valentina)
+    //1 - get a table of possible candidates for a node
+    //2 - replicate the node's data to the chosen candidate
+
+    private void rebalanceNodes(){
+        //TODO First find problematic nodes
+
+        //TODO Second find possible nodes for replication
+
+        //Get info on metrics
+        ClusterMetrics metrics = ignite.cluster().forServers().metrics();
+        double cpuload = metrics.getAverageCpuLoad();
     }
 
     /*

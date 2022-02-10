@@ -102,14 +102,14 @@ public class ServerNodeStartup {
         nearCfg.setNearStartSize(50 * 1024 * 1024);
         //Create meta cache with near configs
         CacheConfiguration<HostMetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
-        metaCfg.setCacheMode(CacheMode.PARTITIONED)
+        metaCfg.setCacheMode(CacheMode.REPLICATED)
                 .setIndexedTypes(HostMetricKey.class, MetaMetric.class)
                 .setBackups(1)
                 .setNearConfiguration(nearCfg)
                 .setDataRegionName(persistenceRegionName);
         //Create replicas cache
         CacheConfiguration<HostMetricKey, List<String>> replicaCfg = new CacheConfiguration<>(replicaHostCache);
-        replicaCfg.setCacheMode(CacheMode.PARTITIONED)
+        replicaCfg.setCacheMode(CacheMode.REPLICATED)
                 .setIndexedTypes(HostMetricKey.class, List.class)
                 .setBackups(1)
                 .setDataRegionName(persistenceRegionName);

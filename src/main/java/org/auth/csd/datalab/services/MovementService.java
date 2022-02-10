@@ -194,7 +194,7 @@ public class MovementService implements MovementInterface {
             remoteSrvInterface.ingestHistoricalMonitoring(values);
         }
         replicate = true;
-        //TODO Check on cluster - rebalance service will write to replica cache the metrics
+        //TODO rebalance service will write to replica cache the metrics
     }
 
     @Override
@@ -223,7 +223,6 @@ public class MovementService implements MovementInterface {
             localMeta.forEach((k,v) -> tmpRes.put(k.metric, new Monitoring(v, values.getOrDefault(k, new ArrayList<>()))));
             result.put(localNode, tmpRes);
         }else{
-            //TODO Check on cluster if it works
             //Get the meta queried
             HashMap<HostMetricKey, MetaMetric> meta = extractMetaData(filter, nodeList.toArray(new String[0]));
             HashMap<String, HashSet<HostMetricKey>> nodeSet = getReplicaSet(meta.keySet());
@@ -253,7 +252,6 @@ public class MovementService implements MovementInterface {
             Tuple2<Double,Long> values = srvInterface.extractMonitoringQuery(localMeta.keySet(), from, to, agg);
             finalTuple = combineTuples(finalTuple, values, agg);
         }else {
-            //TODO Check on cluster if it works
             //Get the meta queried
             HashMap<HostMetricKey, MetaMetric> meta = extractMetaData(filter, nodeList.toArray(new String[0]));
             HashMap<String, HashSet<HostMetricKey>> nodeSet = getReplicaSet(meta.keySet());
@@ -275,7 +273,6 @@ public class MovementService implements MovementInterface {
 
     @Override
     public HashMap<HostMetricKey, MetaMetric> extractMonitoringList(HashMap<String, HashSet<String>> filter, HashSet<String> nodesList) {
-        //TODO Check on cluster
         HashMap<HostMetricKey, MetaMetric> result;
         if (nodesList.isEmpty()) {
             String[] hostnames = ignite.cluster().forServers().hostNames().toArray(new String[0]);
@@ -302,7 +299,7 @@ public class MovementService implements MovementInterface {
             }
             return false;
         }else{
-            //TODO Check on cluster
+            //TODO Check on cluster when rebalance is ready
             HashMap<HostMetricKey, MetaMetric> replicatedMeta = extractMetaData(filter, nodeList.toArray(new String[0]));
             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
             return srvInterface.deleteMonitoring(replicatedMeta.keySet());
@@ -316,6 +313,11 @@ public class MovementService implements MovementInterface {
             result.put(node.hostNames().toString(), node.attribute("data.head"));
         }
         return result;
+    }
+
+    @Override
+    public void setReplication(boolean replica) {
+        replicate = replica;
     }
 
     @Override
@@ -358,6 +360,15 @@ public class MovementService implements MovementInterface {
 //        myMeta.put(test2, metatest);
 //        myMeta.put(test3, metatest);
 //        myMeta.put(test4, metatest);
+
+//        listtest.add("puma.csd.auth.gr");
+//        HostMetricKey test = new HostMetricKey("metr1","as1", "unicorn.csd.auth.gr");
+//        myReplica.put(test, listtest);
+//        MovementInterface srvInterface = ignite.services(ignite.cluster().forHost("unicorn.csd.auth.gr")).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+////        MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+//        Set<HostMetricKey> test2 = new HashSet<>();
+//        test2.add(test);
+//        srvInterface.startReplication(test2, "puma.csd.auth.gr");
     }
 
     @Override

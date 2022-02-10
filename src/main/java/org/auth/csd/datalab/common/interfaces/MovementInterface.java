@@ -15,9 +15,6 @@ public interface MovementInterface extends Service {
     /** Service name */
     public static final String SERVICE_NAME = "MovementService";
 
-
-    void startReplication(Set<HostMetricKey> metrics, String remote);
-
     void ingestMonitoring(HashMap<MetricKey, InputJson> metrics);
     HashMap<String, HashMap<MetricKey, Monitoring>> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList);
     Double extractMonitoringQuery(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList, int agg);
@@ -25,5 +22,8 @@ public interface MovementInterface extends Service {
     Boolean deleteMonitoring(HashMap<String, HashSet<String>> filter, HashSet<String> nodeList);
 
     HashMap<String, Boolean> extractNodes();
+
+    void startReplication(Set<HostMetricKey> metrics, String remote);
+    void setReplication(boolean replica);
 
 }

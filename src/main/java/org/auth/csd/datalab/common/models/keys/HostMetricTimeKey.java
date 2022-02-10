@@ -3,6 +3,8 @@ package org.auth.csd.datalab.common.models.keys;
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
 import org.auth.csd.datalab.common.models.InputJson;
 
+import java.util.Objects;
+
 
 public class HostMetricTimeKey extends HostMetricKey {
 
@@ -23,6 +25,18 @@ public class HostMetricTimeKey extends HostMetricKey {
 
     @QuerySqlField(index = true, descending = true)
     public long timestamp;
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        HostMetricTimeKey otherKey = (HostMetricTimeKey) o;
+        return metric.equals(otherKey.metric) && hostname.equals(otherKey.hostname) && timestamp == otherKey.timestamp;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(metric, hostname, timestamp);
+    }
 
     @Override
     public String toString() {
