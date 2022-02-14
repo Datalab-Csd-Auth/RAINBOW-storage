@@ -194,7 +194,6 @@ public class MovementService implements MovementInterface {
             remoteSrvInterface.ingestHistoricalMonitoring(values);
         }
         replicate = true;
-        //TODO rebalance service will write to replica cache the metrics
     }
 
     @Override

@@ -4,12 +4,13 @@ import org.apache.ignite.*;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.*;
+import org.apache.ignite.events.EventType;
 import org.apache.ignite.services.ServiceConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 import org.auth.csd.datalab.common.filter.DataFilter;
 import org.auth.csd.datalab.common.filter.HeadFilter;
-import org.auth.csd.datalab.common.interfaces.RebalanceInterface;
+import org.auth.csd.datalab.common.interfaces.PlacementInterface;
 import org.auth.csd.datalab.common.models.keys.*;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
@@ -56,7 +57,7 @@ public class ServerNodeStartup {
         Ignite ignite = Ignition.start(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
-        ignite.cluster().baselineAutoAdjustTimeout(60000);
+        ignite.cluster().baselineAutoAdjustTimeout(5000);
         System.out.println("Local node: " + localNode);
     }
 
@@ -80,6 +81,10 @@ public class ServerNodeStartup {
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
         );
+        //Enable events
+        cfg.setIncludeEventTypes(EventType.EVT_NODE_JOINED, EventType.EVT_NODE_LEFT,
+                EventType.EVT_NODE_FAILED);
+
         //Add the data regions to context
         cfg.setDataStorageConfiguration(dataStorageConfiguration());
         //Cache configurations
@@ -102,7 +107,7 @@ public class ServerNodeStartup {
         nearCfg.setNearStartSize(50 * 1024 * 1024);
         //Create meta cache with near configs
         CacheConfiguration<HostMetricKey, MetaMetric> metaCfg = new CacheConfiguration<>(metaCacheName);
-        metaCfg.setCacheMode(CacheMode.REPLICATED)
+        metaCfg.setCacheMode(CacheMode.REPLICATED) //TODO change these to partitioned?
                 .setIndexedTypes(HostMetricKey.class, MetaMetric.class)
                 .setBackups(1)
                 .setNearConfiguration(nearCfg)
@@ -133,7 +138,7 @@ public class ServerNodeStartup {
             cfg.setCacheConfiguration(latestCfg, historicalCfg, metaCfg, replicaCfg, analyticsCfg);
         }
         //Activate services on nodes
-        cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), rebalanceServiceConfiguration());
+        cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), placementServiceConfiguration());
 
         /*
         //=============DEBUG Logging
@@ -179,13 +184,13 @@ public class ServerNodeStartup {
         return sCfg;
     }
 
-    private static ServiceConfiguration rebalanceServiceConfiguration() {
+    private static ServiceConfiguration placementServiceConfiguration() {
         //Gives back a Node Singleton Service
         ServiceConfiguration sCfg = new ServiceConfiguration();
-        sCfg.setName(RebalanceInterface.SERVICE_NAME);
+        sCfg.setName(PlacementInterface.SERVICE_NAME);
         sCfg.setMaxPerNodeCount(1);
         sCfg.setNodeFilter(new HeadFilter());
-        sCfg.setService(new RebalanceService());
+        sCfg.setService(new PlacementService());
         return sCfg;
     }
 
