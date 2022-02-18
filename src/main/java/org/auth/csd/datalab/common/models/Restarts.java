@@ -4,22 +4,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Restarts {
-    public int restarts;
-    public List<Long> startTimes;
+    public List<Long> restartTimes;
+    public List<Long> failTimes;
+    public long startTime;
+    public long lastReplication;
 
-    public Restarts() {
-        restarts = 0;
-        startTimes = new ArrayList<>();
+    public Restarts(long startTime) {
+        this.startTime = startTime;
+        restartTimes = new ArrayList<>();
+        failTimes = new ArrayList<>();
+        lastReplication = 0L;
     }
 
-    public Restarts(long timestamp) {
-        restarts = 0;
-        startTimes = new ArrayList<>();
-        startTimes.add(timestamp);
-    }
 
     public void addRestart(long timestamp) {
-        restarts += 1;
-        startTimes.add(timestamp);
+        restartTimes.add(timestamp);
+    }
+
+    public void addFail(long timestamp) {
+        failTimes.add(timestamp);
+    }
+
+    public void addReplication(long timestamp){
+        lastReplication = timestamp;
     }
 }

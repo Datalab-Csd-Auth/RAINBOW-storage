@@ -35,8 +35,8 @@ public class MovementService implements MovementInterface {
      * Reference to the cache.
      */
     private static IgniteCache<HostMetricKey, MetaMetric> myMeta;
-    private static IgniteCache<HostMetricKey, List<String>> myReplica;
-    private static boolean replicate = false;
+    private static IgniteCache<HostMetricKey, Set<String>> myReplica;
+    private boolean replicate = false;
 
     private void metaTransform(HashMap<HostMetricKey, MetaMetric> result, QueryCursor<List<?>> cursor) {
         for (List<?> row : cursor) {
@@ -81,7 +81,7 @@ public class MovementService implements MovementInterface {
     private void replicateNewMonitoring(HashMap<MetricKey, InputJson> metrics){
         HashMap<String, HashMap<MetricKey, InputJson>> replicas = new HashMap<>();
         for(MetricKey key: metrics.keySet()){
-            List<String> remotes = myReplica.get(new HostMetricKey(key, localNode));
+            Set<String> remotes = myReplica.get(new HostMetricKey(key, localNode));
             if(remotes != null) {
                 remotes.forEach(k -> {
                     if(replicas.containsKey(k)){
@@ -118,7 +118,7 @@ public class MovementService implements MovementInterface {
                 continue;
             }
             //Get replicas
-            List<String> tmpReplicas = myReplica.get(key);
+            Set<String> tmpReplicas = myReplica.get(key);
             //If replicas contain the local node, get just that
             if(tmpReplicas != null && tmpReplicas.contains(localNode)) {
                 //Add the hostname to the list
@@ -323,64 +323,14 @@ public class MovementService implements MovementInterface {
     public void init(ServiceContext ctx) {
         System.out.println("Initializing Movement Service on node:" + ignite.cluster().localNode());
         //Get the cache that is designed in the config for the latest data
-        myMeta = ignite.cache(metaCacheName);
-        myReplica = ignite.cache(replicaHostCache);
-//        String hostlocal = "puma.csd.auth.gr";
-//        String host1 = "test1.csd.auth.gr";
-//        String host2 = "test2.csd.auth.gr";
-//        String host3 = "test3.csd.auth.gr";
-//        String host4 = "test4.csd.auth.gr";
-//        String host5 = "test5.csd.auth.gr";
-//        String host6 = "test6.csd.auth.gr";
-//        HostMetricKey test1 = new HostMetricKey("metr1", "as1", host6);
-//        HostMetricKey test2 = new HostMetricKey("metr1", "as2", host6);
-//        HostMetricKey test3 = new HostMetricKey("metr2", "as1", host1);
-//        HostMetricKey test4 = new HostMetricKey("metr2", "as2", host6);
-//        ArrayList<String> listtest = new ArrayList<>();
-//        listtest.add(host1);
-//        listtest.add(host2);
-//        listtest.add(host4);
-//        myReplica.put(test1, listtest);
-//        listtest.clear();
-//        listtest.add(host2);
-//        listtest.add(host3);
-//        listtest.add(host4);
-//        myReplica.put(test2, listtest);
-////        listtest.clear();
-////        listtest.add(host1);
-////        listtest.add(host3);
-////        myReplica.put(test3, listtest);
-//        listtest.clear();
-//        listtest.add(host5);
-//        myReplica.put(test4, listtest);
-//
-//        MetaMetric metatest = new MetaMetric("","","","","",5,5,true,"","","","","");
-//        myMeta.put(test1, metatest);
-//        myMeta.put(test2, metatest);
-//        myMeta.put(test3, metatest);
-//        myMeta.put(test4, metatest);
-
-//        listtest.add("puma.csd.auth.gr");
-//        HostMetricKey test = new HostMetricKey("metr1","as1", "unicorn.csd.auth.gr");
-//        myReplica.put(test, listtest);
-//        MovementInterface srvInterface = ignite.services(ignite.cluster().forHost("unicorn.csd.auth.gr")).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
-////        MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
-//        Set<HostMetricKey> test2 = new HashSet<>();
-//        test2.add(test);
-//        srvInterface.startReplication(test2, "puma.csd.auth.gr");
+        myMeta = ignite.cache(META_CACHE_NAME);
+        myReplica = ignite.cache(REPLICA_HOST_CACHE);
     }
 
     @Override
     public void execute(ServiceContext ctx) {
         System.out.println("Executing Movement Service on node:" + ignite.cluster().localNode());
         //Check if replication is needed after a restart
-        //For some reason filter does not work
-        IgniteBiPredicate<HostMetricKey, List<String>> filter = (key, val) -> {
-            System.out.println(key.hostname);
-            System.out.println(key.hostname.equals(localNode));
-            System.out.println(Objects.equals(key.hostname, localNode));
-            return Objects.equals(key.hostname, localNode);
-        };
         //So we go with a full scan query
         try (QueryCursor<Cache.Entry<HostMetricKey, List<String>>> qryCursor = myReplica.query(new ScanQuery<>())) {
             for (Cache.Entry<HostMetricKey, List<String>> entry: qryCursor.getAll()){
@@ -390,7 +340,6 @@ public class MovementService implements MovementInterface {
                 }
             }
         }
-        System.out.println(replicate);
     }
 
     @Override

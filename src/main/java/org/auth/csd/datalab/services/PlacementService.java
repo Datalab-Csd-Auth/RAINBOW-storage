@@ -16,13 +16,13 @@ import org.auth.csd.datalab.common.models.Restarts;
 import org.auth.csd.datalab.common.models.keys.HostMetricKey;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.jetbrains.annotations.NotNull;
-import org.w3c.dom.Node;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.auth.csd.datalab.ServerNodeStartup.*;
+import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
 
 public class PlacementService implements PlacementInterface {
 
@@ -32,14 +32,14 @@ public class PlacementService implements PlacementInterface {
     /**
      * Reference to the cache.
      */
-    private static IgniteCache<HostMetricKey, List<String>> myReplica;
-    private static HashMap<String, Restarts> restarts;
-    private static HashMap<String, Restarts> fails;
-    private static HashMap<String, Integer> replicas; //This holds the reverse list of replicas, i.e. nodes that have replicated data and the number of ignite instances that replicate to this node
-    private static final int maxReplicas = 3;
-    private static final int stableMaxFails = 1;
-    private static final long oldPeriod = (1000 * 60 * 60 * 24 * 7); //1 week
-    private static final long midPeriod = (1000 * 60 * 60 * 24 * 2); //2 days
+    private static IgniteCache<HostMetricKey, Set<String>> myReplica;
+    private static IgniteCache<String, Restarts> myRestarts;
+    private static final int STABLE_MAX_FAILS = 1;
+    private static final long OLD_PERIOD = (1000 * 60 * 60 * 24 * 7); //1 week
+    private static final long MID_PERIOD = (1000 * 60 * 60 * 24 * 2); //2 days
+    private static long interval = 1800; //Seconds (30 mins default)
+    private static final long PROBLEMATIC_TAG_INTERVAL = 3600; //(Seconds) Tag the node as a possible problem if it hasn't been replicated in the last XXX time period
+    private static final double PROBLEMATIC_THRESHOLD = 50; //Threshold to identify the node as problematic (Possibly needs to be refined)
 
     private void startListener() {
         //Get ignite events
@@ -49,88 +49,89 @@ public class PlacementService implements PlacementInterface {
             //Get evt node and type
             int type = evt.type();
             String hostname = evt.eventNode().hostNames().iterator().next();
-            if (type == EventType.EVT_NODE_JOINED) {
-                Restarts tmp;
-                if (restarts.containsKey(hostname)) {
-                    tmp = restarts.get(hostname);
-                    tmp.addRestart(System.currentTimeMillis());
-                } else tmp = new Restarts(System.currentTimeMillis());
-                restarts.put(hostname, tmp);
-            } else if (type == EventType.EVT_NODE_FAILED) {
-                Restarts tmp = fails.getOrDefault(hostname, new Restarts());
-                tmp.addRestart(System.currentTimeMillis());
-                fails.put(hostname, tmp);
+            long currTime = System.currentTimeMillis();
+            boolean newHost = !myRestarts.containsKey(hostname);
+            if(newHost) myRestarts.put(hostname, new Restarts(currTime));
+            else {
+                Restarts tmp = myRestarts.get(hostname);
+                if (type == EventType.EVT_NODE_JOINED) {
+                    tmp.addRestart(currTime);
+                    myRestarts.put(hostname, tmp);
+                } else if (type == EventType.EVT_NODE_FAILED) {
+                    tmp.addFail(currTime);
+                    myRestarts.put(hostname, tmp);
+                }
             }
             return true; // Continue listening.
         };
         // Subscribe to the discovery events that are triggered on the local node.
-        events.localListen(localListener, EventType.EVT_NODE_JOINED, EventType.EVT_NODE_LEFT, EventType.EVT_NODE_FAILED);
+        events.localListen(localListener, EventType.EVT_NODE_JOINED, EventType.EVT_NODE_FAILED);
     }
 
-    //TODO make 2 requests so that external services can replicate stuff (valentina)
-    //1 - get a table of possible candidates for a node
-    //2 - replicate the node's data to the chosen candidate
-
-    private void decidePlacement() {
+    private boolean decidePlacement() {
         //First find the top-N problematic nodes
         List<NodeScore> problematicNodes = findProblematicNodes(1);
-        if (problematicNodes != null) {
+        if (!problematicNodes.isEmpty()) {
             //Then find the stable nodes
             List<NodeScore> stableNodes = findStableNodes(0, problematicNodes.stream().map(k -> k.node).collect(Collectors.toList()));
-            if (stableNodes != null) {
+            if (!stableNodes.isEmpty()) {
                 for (NodeScore source : problematicNodes) {
                     Map.Entry<NodeScore, List<HostMetricKey>> dest = findReplicaDestination(source, stableNodes);
-                    if(ignite.cluster().forHost(dest.getKey().node).nodes().size() > 0){
+                    if (dest != null && !ignite.cluster().forHost(source.node).nodes().isEmpty()) {
+                        long currTime = System.currentTimeMillis();
                         //Replicate stuff
-                        MovementInterface srvInterface = ignite.services(ignite.cluster().forHost(dest.getKey().node)).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+                        MovementInterface srvInterface = ignite.services(ignite.cluster().forHost(source.node)).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
                         srvInterface.startReplication(new HashSet<>(dest.getValue()), dest.getKey().node);
+                        //Update the last replication time
+                        Restarts tmp = myRestarts.get(source.node); //No need for check. It has been completed on finding the problematic node
+                        tmp.addReplication(currTime);
+                        myRestarts.put(source.node, tmp);
                         //Update the replica table
+                        String newHost = dest.getKey().node;
                         dest.getValue().forEach(k -> {
-                            List<String> repls = myReplica.get(k);
-                            repls.add(dest.getKey().node);
+                            Set<String> repls;
+                            if(myReplica.containsKey(k)) repls = myReplica.get(k);
+                            else repls = new HashSet<>();
+                            repls.add(newHost);
                             myReplica.put(k, repls);
                         });
+                        return true;
                     }
                 }
             }
         }
+        return false;
     }
 
-
-    private Map.Entry<NodeScore, List<HostMetricKey>> findReplicaDestination(NodeScore source, List<NodeScore> dest) {
-        NodeScore resultNode;
-        List<HostMetricKey> metricsToReplicate = new ArrayList<>();
-        //Get all data points for the source node
-        MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
-        HashSet<String> sourceSet = new HashSet<>();
-        sourceSet.add(source.node);
-        HashSet<HostMetricKey> metrics = (HashSet<HostMetricKey>) srvInterface.extractMonitoringList(new HashMap<>(), sourceSet).keySet();
-        int metricSize = metrics.size();
-        //Get already replicated data points
-        Map<HostMetricKey, List<String>> replicas = myReplica.getAll(metrics);
-        HashMap<String, Integer> replicatedMetrics = new HashMap<>();
-        replicas.values().stream().flatMap(List::stream).forEach(k -> replicatedMetrics.put(k, replicatedMetrics.getOrDefault(k,0) + 1));
-        AtomicInteger tmpPos = new AtomicInteger(dest.size()+1);
-        //If a node that already stores the problematic nodes data is within the top 50% of the stable nodes and has only a set of the metrics then store the rest of them there as well
-        replicatedMetrics.forEach((k,v) -> {
-            if(v < metricSize)
-                for (NodeScore tmp : dest)
-                    if(tmp.node.equals(k)) tmpPos.set(Math.min(dest.indexOf(tmp), tmpPos.get()));
-        });
-        if (tmpPos.get() < dest.size()+1) {
-            //Get the diff of the metrics and store them
-            resultNode = dest.get(tmpPos.get());
-            NodeScore finalResultNode = resultNode;
-            metrics.forEach(k -> {
-                if(!replicas.get(k).contains(finalResultNode.node)) metricsToReplicate.add(k);
-            });
-        }else{
-            //Choose the first one and replicate everything
-            resultNode = dest.get(0);
-            metricsToReplicate.addAll(metrics);
+    private List<NodeScore> findProblematicNodes(int topN) {
+        ArrayList<NodeScore> problematicNodes = new ArrayList<>();
+        long currTime = System.currentTimeMillis();
+        for (ClusterNode node : ignite.cluster().forServers().forRemotes().nodes()) {
+            String hostname = node.hostNames().iterator().next();
+            Restarts nodeFails = (myRestarts.containsKey(hostname)) ? myRestarts.get(hostname) : null;
+            if (nodeFails == null || nodeFails.failTimes.size() < 1 || nodeFails.lastReplication >= currTime - PROBLEMATIC_TAG_INTERVAL) continue; //It is not a problematic node
+            //Else get a weighted average of the time between fails
+            //Start by getting the start time of the node
+            long startTime = nodeFails.startTime;
+            double sum = 0; //Sum the diff between fails with weights
+            long oldFails = nodeFails.failTimes.stream().filter(k -> k <= currTime - OLD_PERIOD).count();
+            long midFails = nodeFails.failTimes.stream().filter(k -> k > currTime - OLD_PERIOD && k <= currTime - MID_PERIOD).count();
+            long newFails = nodeFails.failTimes.stream().filter(k -> k > currTime - MID_PERIOD).count();
+            for (int i = 0; i < nodeFails.failTimes.size(); i++) {
+                long timestamp = nodeFails.failTimes.get(i);
+                double a;
+                if (timestamp <= currTime - OLD_PERIOD) a = 0.5 * oldFails;
+                else if (timestamp <= currTime - MID_PERIOD) a = midFails;
+                else a = 2D * newFails;
+                if (i == 0) sum += a * (timestamp - startTime);
+                else sum += a * (timestamp - nodeFails.failTimes.get(i - 1));
+            }
+            //Add the node with the score in the map if it passes above a threshold
+            if (sum >= PROBLEMATIC_THRESHOLD) problematicNodes.add(new NodeScore(hostname, sum));
         }
-        Map.Entry<NodeScore, List<HostMetricKey>> res = new AbstractMap.SimpleEntry<>(resultNode, metricsToReplicate);
-        return res;
+        //Find and return the top N nodes
+        if (problematicNodes.isEmpty()) return problematicNodes;
+        return sortScores(topN, problematicNodes);
     }
 
     private List<NodeScore> findStableNodes(int topN, List<String> exclude) {
@@ -138,53 +139,68 @@ public class PlacementService implements PlacementInterface {
         long currTime = System.currentTimeMillis();
         for (ClusterNode node : ignite.cluster().forServers().forRemotes().nodes()) {
             String hostname = node.hostNames().iterator().next();
-            if (exclude.contains(hostname)) continue;
-            int replications = replicas.getOrDefault(hostname, 0);
-            if (replications > maxReplicas) continue;
-            //Get number of fails
-            int nodeFails = (int) fails.getOrDefault(hostname, new Restarts()).startTimes.stream().filter(k -> k > currTime - midPeriod).count();
-            if (nodeFails > stableMaxFails) continue; //If it failed many times recently exclude it
-            //Sum up the restarts and the fails
-            Restarts tmpRestart = restarts.getOrDefault(hostname, new Restarts(currTime));
-            double nodeRestarts = (-tmpRestart.restarts - (nodeFails * 3D)) * (currTime - tmpRestart.startTimes.get(0)) / (replications+1); //Get the time alive of the node minus the restarts
-            //Add the node with the score in the map (Bigger score = better node)
-            stableNodes.add(new NodeScore(hostname, nodeRestarts));
+            Restarts nodeInfo = (myRestarts.containsKey(hostname)) ? myRestarts.get(hostname) : null;
+            if(!exclude.contains(hostname) && nodeInfo != null){
+                //Get number of fails
+                long nodeFails = nodeInfo.failTimes.stream().filter(k -> k > currTime - MID_PERIOD).count();
+                if (nodeFails > STABLE_MAX_FAILS || nodeInfo.lastReplication > currTime - PROBLEMATIC_TAG_INTERVAL) //Either it has failed too many times or it has been replicated in the last hour
+                    continue; //If it failed many times recently exclude it
+                //Sum up the restarts and the fails
+                double nodeRestarts = (-nodeInfo.restartTimes.size() - (nodeFails * 3D)) * (currTime - nodeInfo.startTime); //Get the time alive of the node minus the restarts
+                //Add the node with the score in the map (Bigger score = better node)
+                stableNodes.add(new NodeScore(hostname, nodeRestarts));
+            }
         }
         //Find and return the top N nodes
-        if (stableNodes.isEmpty()) return null;
+        if (stableNodes.isEmpty()) return stableNodes;
         return sortScores(topN, stableNodes);
     }
 
-    private List<NodeScore>findProblematicNodes(int topN) {
-        ArrayList<NodeScore> problematicNodes = new ArrayList<>();
-        long currTime = System.currentTimeMillis();
-        for (ClusterNode node : ignite.cluster().forServers().forRemotes().nodes()) {
-            String hostname = node.hostNames().iterator().next();
-            //get number of fails and timestamps between them
-            Restarts nodeFails = fails.getOrDefault(hostname, null);
-            if (nodeFails == null || nodeFails.restarts < 1) continue; //It is not a problematic node
-            //Else get a weighted average of the time between fails
-            //Start by getting the start time of the node
-            long startTime = (restarts.containsKey(hostname)) ? restarts.get(hostname).startTimes.get(0) : nodeFails.startTimes.get(0);
-            double sum = 0; //Sum the diff between fails with weights
-            long oldFails = nodeFails.startTimes.stream().filter(k -> k <= currTime - oldPeriod).count();
-            long midFails = nodeFails.startTimes.stream().filter(k -> k > currTime - oldPeriod && k <= currTime - midPeriod).count();
-            long newFails = nodeFails.startTimes.stream().filter(k -> k > currTime - midPeriod).count();
-            for (int i = 0; i < nodeFails.startTimes.size(); i++) {
-                long timestamp = nodeFails.startTimes.get(i);
-                double a;
-                if (timestamp <= currTime - oldPeriod) a = 0.5 * oldFails;
-                else if (timestamp <= currTime - midPeriod) a = midFails;
-                else a = 2 * newFails;
-                if (i == 0) sum += a * (timestamp - startTime);
-                else sum += a * (timestamp - nodeFails.startTimes.get(i - 1));
+    private Map.Entry<NodeScore, List<HostMetricKey>> findReplicaDestination(NodeScore source, List<NodeScore> dest) {
+        NodeScore resultNode = null;
+        List<HostMetricKey> metricsToReplicate = new ArrayList<>();
+        //Get all data points for the source node
+        MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+        HashSet<String> sourceSet = new HashSet<>();
+        sourceSet.add(source.node);
+        HashMap<HostMetricKey, MetaMetric> tmpMmetrics = srvInterface.extractMonitoringList(new HashMap<>(), sourceSet);
+        if (!tmpMmetrics.isEmpty()) {
+            Set<HostMetricKey> metrics = tmpMmetrics.keySet();
+            int metricSize = metrics.size();
+            //Get already replicated data points
+            Map<HostMetricKey, Set<String>> replicas = myReplica.getAll(metrics);
+            HashMap<String, Integer> replicatedMetrics = new HashMap<>();
+            replicas.values().stream().flatMap(Set::stream).forEach(k -> replicatedMetrics.put(k, replicatedMetrics.getOrDefault(k, 0) + 1));
+            AtomicInteger tmpPos = new AtomicInteger(dest.size() + 1);
+            //If a node that already stores the problematic nodes data is within the top 50% of the stable nodes and has only a set of the metrics then store the rest of them there as well
+            replicatedMetrics.forEach((k, v) -> {
+                if (v < metricSize)
+                    for (NodeScore tmp : dest)
+                        if (tmp.node.equals(k)) tmpPos.set(Math.min(dest.indexOf(tmp), tmpPos.get()));
+            });
+            if (tmpPos.get() < dest.size() + 1) {
+                //Get the diff of the metrics and store them
+                resultNode = dest.get(tmpPos.get());
+                NodeScore finalResultNode = resultNode;
+                metrics.forEach(k -> {
+                    if (!replicas.get(k).contains(finalResultNode.node)) metricsToReplicate.add(k);
+                });
+            } else {
+                //Get iter
+                Iterator<NodeScore> iter = dest.iterator();
+                boolean check = false;
+                while (iter.hasNext() && !check){
+                    NodeScore tmp = iter.next();
+                    if(!replicatedMetrics.containsKey(tmp.node)){
+                        resultNode = tmp;
+                        metricsToReplicate.addAll(metrics);
+                        check = true;
+                    }
+                }
             }
-            //Add the node with the score in the map
-            problematicNodes.add(new NodeScore(hostname, sum));
-        }
-        //Find and return the top N nodes
-        if (problematicNodes.isEmpty()) return null;
-        return sortScores(topN, problematicNodes);
+            if(resultNode == null) return null;
+            else return new AbstractMap.SimpleEntry<>(resultNode, metricsToReplicate);
+        } else return null;
     }
 
     @NotNull
@@ -192,17 +208,16 @@ public class PlacementService implements PlacementInterface {
         Comparator<NodeScore> comparator = Comparator.comparingDouble(k -> k.score);
         nodes.sort(comparator.reversed());
         if (topN > 0) return nodes.subList(0, topN);
-        else return  nodes;
+        else return nodes;
     }
 
     public void init(ServiceContext ctx) {
         System.out.println("Initializing Placement Service on node:" + ignite.cluster().localNode());
-        //Get the cache that is designed in the config for the latest data
-        restarts = new HashMap<>();
-        fails = new HashMap<>();
-        replicas = new HashMap<>();
-        //TODO Maybe initialize it if the node restarts (local cache)
-        myReplica = ignite.cache(replicaHostCache);
+        //Placement interval
+        String tmpInterval = readEnvVariable("PLACEMENT");
+        if (tmpInterval != null) interval = Long.parseLong(tmpInterval);
+        myReplica = ignite.cache(REPLICA_HOST_CACHE);
+        myRestarts = ignite.cache(RESTART_CACHE);
     }
 
     public void execute(ServiceContext ctx) throws InterruptedException {
@@ -212,7 +227,7 @@ public class PlacementService implements PlacementInterface {
         //Every X time period execute the placement method (maybe streaming outlier detection)?
         do {
             decidePlacement();
-            Thread.sleep(10000);
+            Thread.sleep(interval * 1000);
         } while (true);
 
     }

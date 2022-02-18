@@ -360,7 +360,7 @@ public class HttpService implements HttpInterface {
                     return json(ctx, req.isKeepAlive.value, result.toString().getBytes());
                 }
                 //PUT application data (SIMILAR TO ANALYTICS)
-                else if (ServerNodeStartup.app_cache && matches(buf, req.path, URI_APP_PUT)) {
+                else if (ServerNodeStartup.APP_CACHE && matches(buf, req.path, URI_APP_PUT)) {
                     //Read and parse json
                     try {
                         HashMap<AnalyticKey, Metric> data;
@@ -384,7 +384,7 @@ public class HttpService implements HttpInterface {
                     }
                 }
                 //GET application data (SIMILAR TO ANALYTICS)
-                else if (ServerNodeStartup.app_cache && matches(buf, req.path, URI_APP_GET)) {
+                else if (ServerNodeStartup.APP_CACHE && matches(buf, req.path, URI_APP_GET)) {
                     StringBuilder result = new StringBuilder("{\"application\": [");
                     //Read and parse json
                     String body = buf.get(req.body);

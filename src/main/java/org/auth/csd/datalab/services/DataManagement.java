@@ -2,21 +2,22 @@ package org.auth.csd.datalab.services;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
+import org.apache.ignite.IgniteTransactions;
 import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.ServiceContext;
+import org.apache.ignite.transactions.Transaction;
 import org.auth.csd.datalab.common.Helpers.Tuple2;
 import org.auth.csd.datalab.common.interfaces.DataManagementInterface;
 import org.auth.csd.datalab.common.models.InputJson;
 import org.auth.csd.datalab.common.models.keys.*;
-import org.auth.csd.datalab.common.models.values.MetaMetric;
 import org.auth.csd.datalab.common.models.values.Metric;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 
 import java.util.*;
 
 import static org.auth.csd.datalab.ServerNodeStartup.*;
-import static org.auth.csd.datalab.ServerNodeStartup.appCacheName;
+import static org.auth.csd.datalab.ServerNodeStartup.APP_CACHE_NAME;
 import static org.auth.csd.datalab.common.Helpers.combineTuples;
 import static org.auth.csd.datalab.common.Helpers.getQueryValues;
 
@@ -353,8 +354,9 @@ public class DataManagement implements DataManagementInterface {
     //Ingest new monitoring data
     public void ingestHistoricalMonitoring(HashMap<HostMetricKey, List<TimedMetric>> values) {
         for (Map.Entry<HostMetricKey, List<TimedMetric>> entry : values.entrySet()) {
+            HostMetricKey host = entry.getKey();
             HashMap<HostMetricTimeKey, Metric> tmp = new HashMap<>();
-            entry.getValue().forEach(k -> tmp.put(new HostMetricTimeKey(entry.getKey(), k.timestamp), new Metric(k.val)));
+            entry.getValue().forEach(k -> tmp.put(new HostMetricTimeKey(host, k.timestamp), new Metric(k.val)));
             myHistorical.putAll(tmp);
         }
     }
@@ -362,9 +364,13 @@ public class DataManagement implements DataManagementInterface {
     @Override
     //Ingest historical monitoring data
     public void ingestMonitoring(HashMap<MetricKey, InputJson> metrics, String hostname) {
+        IgniteTransactions transactions = ignite.transactions();
         for (Map.Entry<MetricKey, InputJson> entry : metrics.entrySet()) {
             myLatest.put(new HostMetricKey(entry.getKey(),hostname), new TimedMetric(entry.getValue().val, entry.getValue().timestamp));
-            myHistorical.put(new HostMetricTimeKey(entry.getValue(), hostname), new Metric(entry.getValue().val));
+            try (Transaction tx = transactions.txStart()) {
+                myHistorical.put(new HostMetricTimeKey(entry.getValue(), hostname), new Metric(entry.getValue().val));
+                tx.commit();
+            }
         }
     }
 
@@ -418,10 +424,10 @@ public class DataManagement implements DataManagementInterface {
     @Override
     public void init(ServiceContext ctx) {
         //Get the cache that is designed in the config for the latest data
-        myLatest = ignite.cache(latestCacheName);
-        myHistorical = ignite.cache(historicalCacheName);
-        myAnalytics = ignite.cache(analyticsCacheName);
-        if (app_cache) myApp = ignite.cache(appCacheName);
+        myLatest = ignite.cache(LATEST_CACHE_NAME);
+        myHistorical = ignite.cache(HISTORICAL_CACHE_NAME);
+        myAnalytics = ignite.cache(ANALYTICS_CACHE_NAME);
+        if (APP_CACHE) myApp = ignite.cache(APP_CACHE_NAME);
         System.out.println("Initializing Data Management on node:" + ignite.cluster().localNode());
     }
 
