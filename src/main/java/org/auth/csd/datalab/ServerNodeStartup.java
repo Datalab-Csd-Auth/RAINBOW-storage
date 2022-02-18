@@ -37,6 +37,7 @@ public class ServerNodeStartup {
     //Get env variables
     public static final boolean CLUSTER_HEAD = readEnvVariable("CLUSTER_HEAD") != null && Boolean.parseBoolean(readEnvVariable("CLUSTER_HEAD"));
     public static final boolean APP_CACHE = readEnvVariable("APP_CACHE") != null && Boolean.parseBoolean(readEnvVariable("APP_CACHE"));
+    public static final boolean PLACEMENT = readEnvVariable("PLACEMENT") == null || Boolean.parseBoolean(readEnvVariable("PLACEMENT"));
     //Monitoring caches
     public static final String LATEST_CACHE_NAME = "LatestMonitoring";
     public static final String HISTORICAL_CACHE_NAME = "HistoricalMonitoring";
@@ -152,7 +153,8 @@ public class ServerNodeStartup {
             }
         }
         //Activate services on nodes
-        cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), placementServiceConfiguration());
+        if(PLACEMENT) cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration(), placementServiceConfiguration());
+        else cfg.setServiceConfiguration(httpServiceConfiguration(), dataMngmServiceConfiguration(), movementServiceConfiguration());
         return cfg;
     }
 

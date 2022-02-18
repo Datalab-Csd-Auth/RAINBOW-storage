@@ -298,7 +298,6 @@ public class MovementService implements MovementInterface {
             }
             return false;
         }else{
-            //TODO Check on cluster when rebalance is ready
             HashMap<HostMetricKey, MetaMetric> replicatedMeta = extractMetaData(filter, nodeList.toArray(new String[0]));
             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
             return srvInterface.deleteMonitoring(replicatedMeta.keySet());
