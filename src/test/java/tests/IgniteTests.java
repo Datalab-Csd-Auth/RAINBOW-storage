@@ -20,12 +20,16 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Collection;
 
+
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class IgniteTests {
 
+    //In order for the tests to run correctly the node should start in CLUSTER_HEAD mode.
+    //This means that the env variable should be set (CLUSTER_HEAD=true)
     @BeforeAll
     public static void startServer() throws IgniteCheckedException {
         // Start ignite server
+        System.setProperty("CLUSTER_HEAD", "true");
         ServerNodeStartup.createServer("localhost","localhost");
         waitForPort("localhost", 50000, 30000);
     }
@@ -42,9 +46,9 @@ public class IgniteTests {
         //Connect thin client
         try (IgniteClient client = createThinClient()) {
             Collection<String> caches = client.cacheNames();
-            Assertions.assertTrue(caches.contains("LatestMonitoring"));
-            Assertions.assertTrue(caches.contains("HistoricalMonitoring"));
-            Assertions.assertTrue(caches.contains("MetaMonitoring"));
+            Assertions.assertTrue(caches.contains(ServerNodeStartup.LATEST_CACHE_NAME));
+            Assertions.assertTrue(caches.contains(ServerNodeStartup.HISTORICAL_CACHE_NAME));
+            Assertions.assertTrue(caches.contains(ServerNodeStartup.META_CACHE_NAME));
         }
     }
 
@@ -80,7 +84,7 @@ public class IgniteTests {
         HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
         String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
         //Assert against ground truth
-        String truth = "{\"monitoring\":[{\"metricID\":\"metr1\",\"val\":6.0,\"timestamp\":1611318068003,\"entityID\":\"ent1\",\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false}]}";
+        String truth = "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[{\"metricID\":\"metr1\",\"entityID\":\"ent1\",\"values\":[{\"timestamp\":1611318068003,\"val\":6.0}],\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false,\"pod\":{\"uuid\":\"null\",\"name\":\"null\",\"namespace\":\"null\"},\"container\":{\"id\":\"null\",\"name\":\"null\"}}]}]}";
         Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
     }
 
@@ -98,7 +102,7 @@ public class IgniteTests {
         HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
         String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
         //Assert against ground truth
-        String truth = "{\"monitoring\": [  { \"metricID\": \"metr1\" , \"values\": [  { \"timestamp\": 1611318068003 , \"val\": 6.0 }  ]  ,  \"entityID\": \"ent1\", \"entityType\": \"fog\", \"name\": \"ram\", \"units\": \"gb\", \"desc\": \"RAM\", \"group\": \"fog_group\", \"minVal\": 5.0, \"maxVal\": 100.0, \"higherIsBetter\": false  }  ]}";
+        String truth = "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[{\"metricID\":\"metr1\",\"entityID\":\"ent1\",\"values\":[{\"timestamp\":1611318068003,\"val\":6.0}],\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false,\"pod\":{\"uuid\":\"null\",\"name\":\"null\",\"namespace\":\"null\"},\"container\":{\"id\":\"null\",\"name\":\"null\"}}]}]}";
         Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
     }
 
@@ -116,7 +120,7 @@ public class IgniteTests {
         HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
         String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
         //Assert against ground truth
-        String truth = "{\"monitoring\": [  ]} ";
+        String truth = "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[]}]}";
         Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
     }
 
