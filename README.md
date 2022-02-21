@@ -92,7 +92,7 @@ The available ports that are exposed from the Docker deployment through the abov
 
 ## REST API examples
 
-* For the monitoring data, a `/put` *POST request* needs to have a similar body:
+* For the monitoring data, a `/put` **POST request** needs to have a similar body:
 
 ```
 {"monitoring": [
@@ -124,7 +124,7 @@ The available ports that are exposed from the Docker deployment through the abov
 
 The `entityID`, `metricID`, `val` and `timestamp` fields are mandatory.
 
-* For the monitoring data, a `/get` *POST request* needs to have a similar body:
+* For the monitoring data, a `/get` **POST request** needs to have a similar body:
 
 ```
 {   
@@ -142,7 +142,7 @@ The `from` and `to` variables are optional. If they are missing only the latest 
 
 Using the optional `nodes` keyword with an array of ips (or empty array) returns the requested metric from a set of server nodes (or every active server node):
 
-An example *response* body is:
+An example **response** body is:
 
 ```
 {
@@ -186,14 +186,14 @@ An example *response* body is:
 }
 ```
 
-* For the aggregated query, a `\query` *POST request* needs to have the same body with the `\get` request in addition to one of the aggregated functions:
+* For the aggregated query, a `\query` **POST request** needs to have the same body with the `\get` request in addition to one of the aggregated functions:
 
 ```
 "agg": "sum"/"max"/"min"/"avg"
 
 ```
 
-An example *response* body is:
+An example **response** body is:
 
 ```
 {
@@ -201,7 +201,7 @@ An example *response* body is:
 }
 ```
 
-* For the list of monitoring data, a `/list` POST request needs to have a similar body:
+* For the list of monitoring data, a `/list` **POST request** needs to have a similar body:
 
 ```
 {
@@ -217,7 +217,7 @@ An example *response* body is:
 
 The filters and the node list are used in the same way as the `\get` request for monitoring data. The *fields* keyword is used to reduce the metadata that are returned.
 
-An example *response* body is:
+An example **response** body is:
 
 ```
 {
@@ -241,7 +241,7 @@ An example *response* body is:
 }
 ```
 
-* For the analytics data, a `/analytics/put` *POST request* needs to have a similar body:
+* For the analytics data, a `/analytics/put` **POST request** needs to have a similar body:
 
 ```
 {"analytics": [
@@ -255,7 +255,7 @@ An example *response* body is:
 
 All 3 fields are mandatory.
 
-* For the analytics data, a `/analytics/get` *POST request needs* to have a similar body:
+* For the analytics data, a `/analytics/get` **POST request** needs to have a similar body:
 
 ```
 {   
@@ -266,7 +266,7 @@ All 3 fields are mandatory.
 }
 ```
 
-An example *response* body is:
+An example **response** body is:
 
 ```
 {
@@ -284,4 +284,4 @@ An example *response* body is:
 }
 ```
 
-* The application-specific endpoints work the same as the analytics ones.
+* The application-specific endpoints work the **same as the analytics ones**.
