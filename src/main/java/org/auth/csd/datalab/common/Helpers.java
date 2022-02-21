@@ -12,6 +12,9 @@ import java.util.Set;
 
 public class Helpers {
 
+    private Helpers() {
+    }
+
     public static class Tuple2<K, V> {
 
         public K first;
@@ -42,8 +45,8 @@ public class Helpers {
                 tuple1.second += tuple2.second;
                 return tuple1;
             }
+            default: return null;
         }
-        return null;
     }
 
     /**

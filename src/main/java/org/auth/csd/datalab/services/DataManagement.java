@@ -111,7 +111,7 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Delete analytics data
-    public Boolean deleteApp(Set<String> ids) {
+    public boolean deleteApp(Set<String> ids) {
         if(!ids.isEmpty()) {
             String sql = "DELETE FROM METRIC WHERE key IN ('" + String.join("','", ids) + "')";
             // Iterate over the result set.
@@ -202,7 +202,7 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Delete analytics data
-    public Boolean deleteAnalytics(Set<String> ids) {
+    public boolean deleteAnalytics(Set<String> ids) {
         if (!ids.isEmpty()) {
             String sql = "DELETE FROM METRIC WHERE key IN ('" + String.join("','", ids) + "')";
             // Iterate over the result set.
@@ -407,7 +407,7 @@ public class DataManagement implements DataManagementInterface {
 
     @Override
     //Delete monitoring data
-    public Boolean deleteMonitoring(Set<HostMetricKey> keys) {
+    public boolean deleteMonitoring(Set<HostMetricKey> keys) {
         if (!keys.isEmpty()) {
             StringBuilder sql = new StringBuilder(" WHERE ");
             keys.forEach((k -> sql.append(" (metricID = '").append(k.metric.metricID)

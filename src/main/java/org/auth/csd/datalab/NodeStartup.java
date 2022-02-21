@@ -12,7 +12,7 @@ import static org.auth.csd.datalab.common.Helpers.readEnvVariable;
  */
 public class NodeStartup {
 
-    public static final String discoveryDelimiter = ",";
+    public static final String DISCOVERY_DELIMITER = ",";
 
     public static void main(String[] args) throws IgniteException, UnknownHostException {
         //Get hostname

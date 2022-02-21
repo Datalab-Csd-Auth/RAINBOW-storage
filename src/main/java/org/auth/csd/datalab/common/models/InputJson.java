@@ -11,19 +11,9 @@ public class InputJson {
                      @JsonProperty(value= "val", required = true)double val,
                      @JsonProperty(value= "timestamp", required = true)long timestamp) {
         this.entityID = entityID;
-        this.entityType = entityType;
         this.metricID = metricID;
-        this.name = name;
-        this.units = units;
-        this.desc = desc;
-        this.group = group;
-        this.minVal = minVal;
-        this.maxVal = maxVal;
-        this.higherIsBetter = higherIsBetter;
         this.val = val;
         this.timestamp = timestamp;
-        this.pod = pod;
-        this.container = container;
     }
 
     public String entityID;
@@ -63,9 +53,7 @@ public class InputJson {
 
     public static class Pod {
         public Pod() {
-            this.uuid = uuid;
-            this.namespace = namespace;
-            this.name = name;
+            //Json initialized
         }
         public String uuid;
         public String namespace;
@@ -81,8 +69,7 @@ public class InputJson {
     }
     public static class Container {
         public Container() {
-            this.id = id;
-            this.name = name;
+            //Json initialized
         }
         public String id;
         public String name;

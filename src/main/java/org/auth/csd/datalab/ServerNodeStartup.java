@@ -86,7 +86,7 @@ public class ServerNodeStartup {
         cfg.setUserAttributes(myAtrr);
         cfg.setLocalHost(hostname);
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
-                .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.discoveryDelimiter))))
+                .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.DISCOVERY_DELIMITER))))
         );
         cfg.setConsistentId(hostname);
         cfg.setIgniteInstanceName(hostname);

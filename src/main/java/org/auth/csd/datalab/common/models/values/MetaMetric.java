@@ -68,10 +68,11 @@ public class MetaMetric {
     @QuerySqlField
     public String containerName;
 
+    private final static String NAME_CONSTANT = ", \"name\": \"";
     @Override
     public String toString() {
         return  "\"entityType\": \"" + entityType + "\"" +
-                ", \"name\": \"" + name + "\"" +
+                NAME_CONSTANT + name + "\"" +
                 ", \"units\": \"" + units + "\"" +
                 ", \"desc\": \"" + desc + "\"" +
                 ", \"group\": \"" + groupName + "\"" +
@@ -80,12 +81,12 @@ public class MetaMetric {
                 ", \"higherIsBetter\": " + higherIsBetter +
                 ", \"pod\": {" +
                     " \"uuid\": \"" + podUUID + "\"" +
-                    ", \"name\": \"" + podName + "\"" +
+                    NAME_CONSTANT + podName + "\"" +
                     ", \"namespace\": \"" + podNamespace + "\"" +
                 "}" +
                 ", \"container\": {" +
                     " \"id\": \"" + containerID + "\"" +
-                    ", \"name\": \"" + containerName + "\"" +
+                NAME_CONSTANT + containerName + "\"" +
                 "}";
     }
 
@@ -106,7 +107,7 @@ public class MetaMetric {
                 if(b)
                     result.append("\"");
                 result.append(",");
-            } catch (NoSuchFieldException | IllegalAccessException ignored){}
+            } catch (NoSuchFieldException | IllegalAccessException ignored){ }
         });
         if(!pod.isEmpty()){
             result.append("\"pod\": {");
@@ -126,7 +127,7 @@ public class MetaMetric {
             try {
                 Object val = this.getClass().getField(k).get(this);
                 result.append("\"").append(k).append("\": \"").append(val).append("\",");
-            } catch (NoSuchFieldException | IllegalAccessException ignored){}
+            } catch (NoSuchFieldException | IllegalAccessException ignored){ }
         });
         result.deleteCharAt(result.length() - 1);
         result.append("},");

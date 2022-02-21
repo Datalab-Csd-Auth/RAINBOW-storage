@@ -35,18 +35,32 @@ public class HttpService implements HttpInterface {
 
     @IgniteInstanceResource
     private Ignite ignite;
-    private static HashMap<String, Integer> aggregations = new HashMap<String, Integer>() {
-        {
-            put("max", 0);
-            put("min", 1);
-            put("sum", 2);
-            put("avg", 3);
-        }
-    };
+    private static HashMap<String, Integer> aggregations;
+    private static final String METRIC_STRING = "metricID";
+    private static final String ENTITY_STRING = "entityID";
+    private static final String POD_NAME_STRING = "podName";
+    private static final String POD_NAMESPACE_STRING = "podNamespace";
+    private static final String CONTAINER_STRING = "containerName";
+    //Response messages
+    private static final String ERROR_MSG = "ERROR";
+    private static final String SUCCESS_INGESTION_MSG = "Ingestion successful!";
+    private static final String ERROR_INGESTION_MSG = "Error on data ingestion!";
+    private static final String ERROR_JSON_MSG = "Error on json schema!";
+    private static final String ERROR_EXTRACTION_MSG = "Error on data extraction!";
+    private static final String ERROR_DELETE_MSG = "Error during deletion!";
+    private static final String EMPTY_KEY_MSG = "Empty keyset!";
+    private static final String SUCCESS_DELETE_MSG = "Delete successful!";
+
+
 
     private Server server;
 
     public void init(ServiceContext ctx) {
+         aggregations = new HashMap<>();
+         aggregations.put("max", 0);
+        aggregations.put("min", 1);
+        aggregations.put("sum", 2);
+        aggregations.put("avg", 3);
         server = new CustomHttpServer().listen(50000);
         System.out.println("Initializing Http Server on node:" + ignite.cluster().localNode());
     }
@@ -60,113 +74,12 @@ public class HttpService implements HttpInterface {
         server.shutdown();
     }
 
-    //------------Common----------------
-    //Get filters from json
-    private HashMap<String, HashSet<String>> getFilters(JSONObject obj) {
-        HashMap<String, HashSet<String>> filters = new HashMap<>();
-        if (obj.has("metricID"))
-            filters.put("metricID", new HashSet<>(obj.getJSONArray("metricID").toList().stream().map(Object::toString).collect(Collectors.toList())));
-        if (obj.has("entityID"))
-            filters.put("entityID", new HashSet<>(obj.getJSONArray("entityID").toList().stream().map(Object::toString).collect(Collectors.toList())));
-        if (obj.has("podName"))
-            filters.put("podName", new HashSet<>(obj.getJSONArray("podName").toList().stream().map(Object::toString).collect(Collectors.toList())));
-        if (obj.has("podNamespace"))
-            filters.put("podNamespace", new HashSet<>(obj.getJSONArray("podNamespace").toList().stream().map(Object::toString).collect(Collectors.toList())));
-        if (obj.has("containerName"))
-            filters.put("containerName", new HashSet<>(obj.getJSONArray("containerName").toList().stream().map(Object::toString).collect(Collectors.toList())));
-        return filters;
-    }
-
-    //Get nodes (hostnames) from json
-    private HashSet<String> getNodes(JSONObject obj) {
-        HashSet<String> nodesList = new HashSet<>();
-        if (obj.has("nodes")) { //Get data from the cluster
-            JSONArray nodes = obj.getJSONArray("nodes");
-            nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
-        }
-        return nodesList;
-    }
-
-    //Get first timestamp from json
-    private long getFrom(JSONObject obj) {
-        if (obj.has("from") && obj.getLong("from") >= 0) {
-            return obj.getLong("from");
-        } else return -1;
-    }
-
-    //Get second timestamp from json
-    private long getTo(JSONObject obj, long from) {
-        if (obj.has("to") && obj.getLong("to") >= from) {
-            return obj.getLong("to");
-        } else return -1;
-    }
-
-    //Get filters from json
-    private HashSet<String> getKeys(JSONObject obj) {
-        HashSet<String> keys = new HashSet<>();
-        if (obj.has("key")) {
-            JSONArray tmpKeys = obj.getJSONArray("key");
-            keys.addAll(tmpKeys.toList().stream().map(Object::toString).collect(Collectors.toList()));
-        }
-        return keys;
-    }
-
-    //------------ANALYTICS----------------
-    private HashMap<AnalyticKey, Metric> extractAnalyticsFromJson(JSONArray obj) throws IOException {
-        HashMap<AnalyticKey, Metric> data = new HashMap<>();
-        for (int i = 0; i < obj.length(); i++) {
-            JSONObject o = obj.getJSONObject(i);
-            if (o.has("key") && o.has("val") && o.has("timestamp")) {
-                data.put(new AnalyticKey(o.getString("key"), o.getLong("timestamp")), new Metric(o.getDouble("val")));
-            }
-        }
-        return data;
-    }
-
-    private String beautifyAnalytics(String key, List<TimedMetric> values) {
-        StringBuilder result = new StringBuilder("{\"key\": \"" + key + "\",");
-        result.append("\"values\": [");
-        if (!values.isEmpty()) {
-            values.forEach(v -> result.append("{").append(v).append("},"));
-            result.deleteCharAt(result.length() - 1);
-        }
-        result.append("]}");
-        return result.toString();
-    }
-
-    //------------MONITORING----------------
-    private HashMap<MetricKey, InputJson> extractMonitoringFromJson(JSONArray obj) throws IOException {
-        HashMap<MetricKey, InputJson> metrics = new HashMap<>();
-        for (int i = 0; i < obj.length(); i++) {
-            JSONObject o = obj.getJSONObject(i);
-            ObjectMapper m = new ObjectMapper();
-            try {
-                InputJson myMetric = m.readValue(o.toString(), InputJson.class);
-                metrics.put(new MetricKey(myMetric.metricID, myMetric.entityID), myMetric);
-            } catch (IOException e) {
-                throw e;
-            }
-        }
-        return metrics;
-    }
-
-    private String beautifyMonitoring(MetricKey key, MetaMetric metadata, List<TimedMetric> values) {
-        StringBuilder result = new StringBuilder("{" + key + ",");
-        result.append("\"values\": [");
-        if (!values.isEmpty()) {
-            values.forEach(v -> result.append("{").append(v).append("},"));
-            result.deleteCharAt(result.length() - 1);
-        }
-        result.append("],").append(metadata).append("}");
-        return result.toString();
-    }
 
     //------------SERVER----------------
     private class CustomHttpServer extends AbstractHttpServer {
 
         //Requests
         private final byte[] REQ_POST = "POST".getBytes();
-        private final byte[] REQ_GET = "GET".getBytes();
         private final byte[] REQ_DEL = "DELETE".getBytes();
         //Helpers
         private final byte[] URI_NODES = "/nodes".getBytes();
@@ -201,14 +114,14 @@ public class HttpService implements HttpInterface {
                             metrics = extractMonitoringFromJson(monitor);
                         } catch (IOException e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on json schema!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_JSON_MSG));
                         }
                         MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
                         srvInterface.ingestMonitoring(metrics);
-                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Ingestion successful!"));
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", SUCCESS_INGESTION_MSG));
                     } catch (Exception e) {
                         e.printStackTrace();
-                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data ingestion!"));
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_INGESTION_MSG));
                     }
                 }
                 //GET monitoring data
@@ -229,18 +142,17 @@ public class HttpService implements HttpInterface {
                             //Send stuff to movement service
                             MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
                             HashMap<String, HashMap<MetricKey, Monitoring>> data = srvInterface.extractMonitoring(filters, from, to, nodesList);
-                            for (String node : data.keySet()) {
-                                result.append("{\"node\": \"").append(node).append("\", \"data\": [");
-                                if (!data.get(node).isEmpty()) {
-                                    data.get(node).forEach((k, v) -> result.append(beautifyMonitoring(k, v.metadata, v.values)).append(","));
+                            for (Map.Entry<String, HashMap<MetricKey, Monitoring>> node : data.entrySet()) {
+                                result.append("{\"node\": \"").append(node.getKey()).append("\", \"data\": [");
+                                if (!node.getValue().isEmpty()) {
+                                    node.getValue().forEach((k, v) -> result.append(beautifyMonitoring(k, v.metadata, v.values)).append(","));
                                     result.deleteCharAt(result.length() - 1);
                                 }
                                 result.append("]}");
                             }
-
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
                         }
                     }
                     result.append("]}");
@@ -268,13 +180,13 @@ public class HttpService implements HttpInterface {
                                 Double data = srvInterface.extractMonitoringQuery(filters, from, to, nodesList, aggreg);
                                 return json(ctx, req.isKeepAlive.value, ("{\"value\": " + data + "}").getBytes());
                             } else
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Wrong aggregation!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, "Wrong aggregation!"));
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
                         }
                     }
-                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
                 }
                 //get LIST of monitoring metrics
                 else if (matches(buf, req.path, URI_MON_LIST)) {
@@ -303,7 +215,7 @@ public class HttpService implements HttpInterface {
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
                         }
                     }
                     result.append("]}");
@@ -322,14 +234,14 @@ public class HttpService implements HttpInterface {
                             data = extractAnalyticsFromJson(analytics);
                         } catch (IOException e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on json schema!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_JSON_MSG));
                         }
                         DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                         srvInterface.ingestAnalytics(data);
-                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Ingestion successful!"));
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", SUCCESS_INGESTION_MSG));
                     } catch (Exception e) {
                         e.printStackTrace();
-                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data ingestion!"));
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_INGESTION_MSG));
                     }
                 }
                 //GET analytics data
@@ -353,7 +265,7 @@ public class HttpService implements HttpInterface {
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
                         }
                     }
                     result.append("]}");
@@ -373,14 +285,14 @@ public class HttpService implements HttpInterface {
                             data = extractAnalyticsFromJson(analytics);
                         } catch (IOException e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on json schema!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_JSON_MSG));
                         }
                         DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                         srvInterface.ingestApp(data);
-                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Ingestion successful!"));
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", SUCCESS_INGESTION_MSG));
                     } catch (Exception e) {
                         e.printStackTrace();
-                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data ingestion!"));
+                        return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_INGESTION_MSG));
                     }
                 }
                 //GET application data (SIMILAR TO ANALYTICS)
@@ -404,7 +316,7 @@ public class HttpService implements HttpInterface {
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error on data extraction!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
                         }
                     }
                     result.append("]}");
@@ -438,17 +350,17 @@ public class HttpService implements HttpInterface {
                         try {
                             HashMap<String, HashSet<String>> filters = getFilters(obj);
                             if (filters.isEmpty())
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, EMPTY_KEY_MSG));
                             //Delete stuff
                             MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
                             if (srvInterface.deleteMonitoring(filters, new HashSet<>()))
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Delete successful!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", SUCCESS_DELETE_MSG));
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error during deletion!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_DELETE_MSG));
                         }
                     }
-                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error during deletion!"));
+                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_DELETE_MSG));
                 }
                 //Delete analytics
                 else if (matches(buf, req.path, URI_ANALYTICS)) {
@@ -459,17 +371,17 @@ public class HttpService implements HttpInterface {
                         try {
                             HashSet<String> ids = getKeys(obj);
                             if (ids.isEmpty())
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, EMPTY_KEY_MSG));
                             //Delete stuff
                             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                             if (srvInterface.deleteAnalytics(ids))
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Delete successful!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", SUCCESS_DELETE_MSG));
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error during deletion!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_DELETE_MSG));
                         }
                     }
-                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error during deletion!"));
+                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_DELETE_MSG));
                 }
                 //Delete application (SIMILAR TO ANALYTICS)
                 else if (matches(buf, req.path, URI_APP)) {
@@ -480,21 +392,123 @@ public class HttpService implements HttpInterface {
                         try {
                             HashSet<String> ids = getKeys(obj);
                             if (ids.isEmpty())
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Empty keyset!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, EMPTY_KEY_MSG));
                             //Delete stuff
                             DataManagementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(DataManagementInterface.SERVICE_NAME, DataManagementInterface.class, false);
                             if (srvInterface.deleteApp(ids))
-                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", "Delete successful!"));
+                                return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("OK", SUCCESS_DELETE_MSG));
                         } catch (Exception e) {
                             e.printStackTrace();
-                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error during deletion!"));
+                            return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_DELETE_MSG));
                         }
                     }
-                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message("ERROR", "Error during deletion!"));
+                    return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_DELETE_MSG));
                 }
             }
             return HttpStatus.NOT_FOUND;
         }
+
+        //------------Common----------------
+        //Get filters from json
+        private HashMap<String, HashSet<String>> getFilters(JSONObject obj) {
+            HashMap<String, HashSet<String>> filters = new HashMap<>();
+            if (obj.has(METRIC_STRING))
+                filters.put(METRIC_STRING, new HashSet<>(obj.getJSONArray(METRIC_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            if (obj.has(ENTITY_STRING))
+                filters.put(ENTITY_STRING, new HashSet<>(obj.getJSONArray(ENTITY_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            if (obj.has(POD_NAME_STRING))
+                filters.put(POD_NAME_STRING, new HashSet<>(obj.getJSONArray(POD_NAME_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            if (obj.has(POD_NAMESPACE_STRING))
+                filters.put(POD_NAMESPACE_STRING, new HashSet<>(obj.getJSONArray(POD_NAMESPACE_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            if (obj.has(CONTAINER_STRING))
+                filters.put(CONTAINER_STRING, new HashSet<>(obj.getJSONArray(CONTAINER_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            return filters;
+        }
+
+        //Get nodes (hostnames) from json
+        private HashSet<String> getNodes(JSONObject obj) {
+            HashSet<String> nodesList = new HashSet<>();
+            if (obj.has("nodes")) { //Get data from the cluster
+                JSONArray nodes = obj.getJSONArray("nodes");
+                nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
+            }
+            return nodesList;
+        }
+
+        //Get first timestamp from json
+        private long getFrom(JSONObject obj) {
+            if (obj.has("from") && obj.getLong("from") >= 0) {
+                return obj.getLong("from");
+            } else return -1;
+        }
+
+        //Get second timestamp from json
+        private long getTo(JSONObject obj, long from) {
+            if (obj.has("to") && obj.getLong("to") >= from) {
+                return obj.getLong("to");
+            } else return -1;
+        }
+
+        //Get filters from json
+        private HashSet<String> getKeys(JSONObject obj) {
+            HashSet<String> keys = new HashSet<>();
+            if (obj.has("key")) {
+                JSONArray tmpKeys = obj.getJSONArray("key");
+                keys.addAll(tmpKeys.toList().stream().map(Object::toString).collect(Collectors.toList()));
+            }
+            return keys;
+        }
+
+        //------------ANALYTICS----------------
+        private HashMap<AnalyticKey, Metric> extractAnalyticsFromJson(JSONArray obj) throws IOException {
+            HashMap<AnalyticKey, Metric> data = new HashMap<>();
+            for (int i = 0; i < obj.length(); i++) {
+                JSONObject o = obj.getJSONObject(i);
+                if (o.has("key") && o.has("val") && o.has("timestamp")) {
+                    data.put(new AnalyticKey(o.getString("key"), o.getLong("timestamp")), new Metric(o.getDouble("val")));
+                }
+            }
+            return data;
+        }
+
+        private String beautifyAnalytics(String key, List<TimedMetric> values) {
+            StringBuilder result = new StringBuilder("{\"key\": \"" + key + "\",");
+            result.append("\"values\": [");
+            if (!values.isEmpty()) {
+                values.forEach(v -> result.append("{").append(v).append("},"));
+                result.deleteCharAt(result.length() - 1);
+            }
+            result.append("]}");
+            return result.toString();
+        }
+
+        //------------MONITORING----------------
+        private HashMap<MetricKey, InputJson> extractMonitoringFromJson(JSONArray obj) throws IOException {
+            HashMap<MetricKey, InputJson> metrics = new HashMap<>();
+            for (int i = 0; i < obj.length(); i++) {
+                JSONObject o = obj.getJSONObject(i);
+                ObjectMapper m = new ObjectMapper();
+                try {
+                    InputJson myMetric = m.readValue(o.toString(), InputJson.class);
+                    metrics.put(new MetricKey(myMetric.metricID, myMetric.entityID), myMetric);
+                } catch (IOException e) {
+                    throw e;
+                }
+            }
+            return metrics;
+        }
+
+        private String beautifyMonitoring(MetricKey key, MetaMetric metadata, List<TimedMetric> values) {
+            StringBuilder result = new StringBuilder("{" + key + ",");
+            result.append("\"values\": [");
+            if (!values.isEmpty()) {
+                values.forEach(v -> result.append("{").append(v).append("},"));
+                result.deleteCharAt(result.length() - 1);
+            }
+            result.append("],").append(metadata).append("}");
+            return result.toString();
+        }
+
     }
 
 }

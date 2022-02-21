@@ -19,7 +19,7 @@ public interface MovementInterface extends Service {
     HashMap<String, HashMap<MetricKey, Monitoring>> extractMonitoring(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList);
     Double extractMonitoringQuery(HashMap<String, HashSet<String>> filter, Long from, Long to, HashSet<String> nodeList, int agg);
     HashMap<HostMetricKey, MetaMetric> extractMonitoringList(HashMap<String, HashSet<String>> filter, HashSet<String> nodesList);
-    Boolean deleteMonitoring(HashMap<String, HashSet<String>> filter, HashSet<String> nodeList);
+    boolean deleteMonitoring(HashMap<String, HashSet<String>> filter, HashSet<String> nodeList);
 
     HashMap<String, Boolean> extractNodes();
 

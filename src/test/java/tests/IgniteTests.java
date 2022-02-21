@@ -12,6 +12,8 @@ import org.apache.ignite.client.IgniteClient;
 import org.apache.ignite.configuration.ClientConfiguration;
 import org.auth.csd.datalab.ServerNodeStartup;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -23,6 +25,13 @@ import java.util.Collection;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class IgniteTests {
+
+    private final String jsonPut = "{\"monitoring\": [ { \"entityID\": \"ent1\", \"entityType\": \"fog\", \"metricID\": \"metr1\", \"name\": \"ram\", \"units\": \"gb\", \"desc\": \"RAM\", \"group\": \"fog_group\", \"minVal\": 5, \"maxVal\": 100, \"higherIsBetter\": false, \"val\": 6, \"timestamp\": 1611318068003 } ] }";
+    private final String jsonLatest = "{\"metricID\": [\"metr1\"], \"latest\": true }";
+    private final String jsonHistorical = "{\"metricID\": [\"metr1\"], \"from\": 1611318068000, \"to\": 1611318068010, \"latest\": false }";
+    private final String jsonNull = "{\"metricID\": [\"metr2\"], \"latest\": true }";
+
+
 
     //In order for the tests to run correctly the node should start in CLUSTER_HEAD mode.
     //This means that the env variable should be set (CLUSTER_HEAD=true)
@@ -42,7 +51,7 @@ public class IgniteTests {
 
     @Test
     @Order(1)
-    public void CacheCreation() throws Exception {
+    void CacheCreation() throws Exception {
         //Connect thin client
         try (IgniteClient client = createThinClient()) {
             Collection<String> caches = client.cacheNames();
@@ -52,78 +61,48 @@ public class IgniteTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {jsonPut})
     @Order(2)
-    public void AddMetric() throws Exception {
+    void AddMetric(String arg) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        //Input json
-        String json = "{\"monitoring\": [ { \"entityID\": \"ent1\", \"entityType\": \"fog\", \"metricID\": \"metr1\", \"name\": \"ram\", \"units\": \"gb\", \"desc\": \"RAM\", \"group\": \"fog_group\", \"minVal\": 5, \"maxVal\": 100, \"higherIsBetter\": false, \"val\": 6, \"timestamp\": 1611318068003 } ] }";
         //Create the request
-        StringEntity entity = new StringEntity(json);
+        StringEntity entity = new StringEntity(arg);
         HttpPost httpPost = new HttpPost("http://localhost:50000/put");
         httpPost.setEntity(entity);
         //Get the response
         HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
         String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
         //Assert against ground truth
-        String truth = "{\"result\":\"OK\",\"message\":\"Ingestion successful!\"}";
-        Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
+        Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(getResponse(arg)));
     }
 
-    @Test
+
+    @ParameterizedTest
+    @ValueSource(strings = {jsonLatest, jsonHistorical, jsonNull})
     @Order(3)
-    public void GetLatestMetric() throws Exception {
+    void GetLatestMetric(String arg) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        //Input json
-        String json = "{\"metricID\": [\"metr1\"], \"latest\": true }";
         //Create the request
-        StringEntity entity = new StringEntity(json);
+        StringEntity entity = new StringEntity(arg);
         HttpPost httpPost = new HttpPost("http://localhost:50000/get");
         httpPost.setEntity(entity);
         //Get the response
         HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
         String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
         //Assert against ground truth
-        String truth = "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[{\"metricID\":\"metr1\",\"entityID\":\"ent1\",\"values\":[{\"timestamp\":1611318068003,\"val\":6.0}],\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false,\"pod\":{\"uuid\":\"null\",\"name\":\"null\",\"namespace\":\"null\"},\"container\":{\"id\":\"null\",\"name\":\"null\"}}]}]}";
-        Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
+        Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(getResponse(arg)));
     }
 
-    @Test
-    @Order(4)
-    public void GetHistoricalMetric() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        //Input json
-        String json = "{\"metricID\": [\"metr1\"], \"from\": 1611318068000, \"to\": 1611318068010, \"latest\": false }";
-        //Create the request
-        StringEntity entity = new StringEntity(json);
-        HttpPost httpPost = new HttpPost("http://localhost:50000/get");
-        httpPost.setEntity(entity);
-        //Get the response
-        HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
-        String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
-        //Assert against ground truth
-        String truth = "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[{\"metricID\":\"metr1\",\"entityID\":\"ent1\",\"values\":[{\"timestamp\":1611318068003,\"val\":6.0}],\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false,\"pod\":{\"uuid\":\"null\",\"name\":\"null\",\"namespace\":\"null\"},\"container\":{\"id\":\"null\",\"name\":\"null\"}}]}]}";
-        Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
+    private String getResponse(String arg){
+        switch (arg){
+            case jsonPut: return "{\"result\":\"OK\",\"message\":\"Ingestion successful!\"}";
+            case jsonLatest: return "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[{\"metricID\":\"metr1\",\"entityID\":\"ent1\",\"values\":[{\"timestamp\":1611318068003,\"val\":6.0}],\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false,\"pod\":{\"uuid\":\"null\",\"name\":\"null\",\"namespace\":\"null\"},\"container\":{\"id\":\"null\",\"name\":\"null\"}}]}]}";
+            case jsonHistorical: return "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[{\"metricID\":\"metr1\",\"entityID\":\"ent1\",\"values\":[{\"timestamp\":1611318068003,\"val\":6.0}],\"entityType\":\"fog\",\"name\":\"ram\",\"units\":\"gb\",\"desc\":\"RAM\",\"group\":\"fog_group\",\"minVal\":5.0,\"maxVal\":100.0,\"higherIsBetter\":false,\"pod\":{\"uuid\":\"null\",\"name\":\"null\",\"namespace\":\"null\"},\"container\":{\"id\":\"null\",\"name\":\"null\"}}]}]}";
+            case jsonNull: return "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[]}]}";
+        }
+        return null;
     }
-
-    @Test
-    @Order(5)
-    public void NonExistentMetric() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        //Input json
-        String json = "{\"metricID\": [\"metr2\"], \"latest\": true }";
-        //Create the request
-        StringEntity entity = new StringEntity(json);
-        HttpPost httpPost = new HttpPost("http://localhost:50000/get");
-        httpPost.setEntity(entity);
-        //Get the response
-        HttpResponse httpResponse = HttpClientBuilder.create().build().execute( httpPost );
-        String jsonFromResponse = EntityUtils.toString(httpResponse.getEntity());
-        //Assert against ground truth
-        String truth = "{\"monitoring\":[{\"node\":\"localhost\",\"data\":[]}]}";
-        Assertions.assertEquals(mapper.readTree(jsonFromResponse), mapper.readTree(truth));
-    }
-
 
     private IgniteClient createThinClient(){
         ClientConfiguration cfg = new ClientConfiguration().setAddresses("localhost:10800");
