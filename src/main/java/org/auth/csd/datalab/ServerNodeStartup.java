@@ -88,7 +88,6 @@ public class ServerNodeStartup {
         cfg.setDiscoverySpi(new TcpDiscoverySpi()
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.DISCOVERY_DELIMITER))))
         );
-        cfg.setConsistentId(hostname);
         //Enable events
         cfg.setIncludeEventTypes(EventType.EVT_NODE_JOINED, EventType.EVT_NODE_LEFT,
                 EventType.EVT_NODE_FAILED);
