@@ -19,6 +19,7 @@ import org.auth.csd.datalab.common.Helpers.Tuple2;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 
 import javax.cache.Cache;
+import javax.persistence.criteria.CriteriaBuilder;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -88,7 +89,11 @@ public class MovementService implements MovementInterface {
                         HashMap<MetricKey, InputJson> tmpMetric = replicas.get(k);
                         tmpMetric.put(key.getKey(), key.getValue());
                         replicas.put(k, tmpMetric);
-                    }else replicas.put(k, new HashMap<MetricKey, InputJson>(){{put(key.getKey(), key.getValue());}});
+                    }else {
+                        HashMap<MetricKey, InputJson> tmpHash = new HashMap<>();
+                        tmpHash.put(key.getKey(), key.getValue());
+                        replicas.put(k, tmpHash);
+                    }
                 });
             }
         }

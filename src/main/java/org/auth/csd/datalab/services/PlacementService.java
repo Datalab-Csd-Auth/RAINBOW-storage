@@ -40,6 +40,7 @@ public class PlacementService implements PlacementInterface {
     private static long interval = 1800; //Seconds (30 mins default)
     private static final long PROBLEMATIC_TAG_INTERVAL = 3600; //(Seconds) Tag the node as a possible problem if it hasn't been replicated in the last XXX time period
     private static final double PROBLEMATIC_THRESHOLD = 50; //Threshold to identify the node as problematic (Possibly needs to be refined)
+    private static volatile boolean cancelled=false; //Loop cancel
 
     private void startListener() {
         //Get ignite events
@@ -227,6 +228,7 @@ public class PlacementService implements PlacementInterface {
         //Every X time period execute the placement method (maybe streaming outlier detection)?
         do {
             decidePlacement();
+            if(cancelled) break;
             Thread.sleep(interval * 1000);
         } while (true);
 
@@ -234,6 +236,7 @@ public class PlacementService implements PlacementInterface {
 
     public void cancel(ServiceContext ctx) {
         System.out.println("Stopping Placement Service on node:" + ignite.cluster().localNode());
+        cancelled=true;
     }
 
 }
