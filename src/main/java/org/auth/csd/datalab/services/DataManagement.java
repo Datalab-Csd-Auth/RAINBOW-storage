@@ -112,17 +112,18 @@ public class DataManagement implements DataManagementInterface {
     @Override
     //Delete analytics data
     public boolean deleteApp(Set<String> ids) {
+        boolean result = false;
         if(!ids.isEmpty()) {
             String sql = "DELETE FROM METRIC WHERE key IN ('" + String.join("','", ids) + "')";
             // Iterate over the result set.
             try (QueryCursor<List<?>> cursor = getQueryValues(myApp, sql)) {
                 for (List<?> row : cursor) {
-                    return !((Long) row.get(0) == 0);
+                    result = ((Long) row.get(0) != 0);
+                    if(result) break;
                 }
             }
-            return false;
         }
-        return false;
+        return result;
     }
 
     //------------ANALYTICS----------------
@@ -203,17 +204,18 @@ public class DataManagement implements DataManagementInterface {
     @Override
     //Delete analytics data
     public boolean deleteAnalytics(Set<String> ids) {
+        boolean result = false;
         if (!ids.isEmpty()) {
             String sql = "DELETE FROM METRIC WHERE key IN ('" + String.join("','", ids) + "')";
             // Iterate over the result set.
             try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
                 for (List<?> row : cursor) {
-                    return !((Long) row.get(0) == 0);
+                    result = ((Long) row.get(0) != 0);
+                    if(result) break;
                 }
             }
-            return false;
         }
-        return false;
+        return result;
     }
 
     //------------MONITORING----------------
@@ -270,13 +272,14 @@ public class DataManagement implements DataManagementInterface {
     }
 
     private Tuple2<Double, Long> extractMonitoringQuery(HostMetricKey key) {
+        Tuple2<Double, Long> res = null;
         String sql = "SELECT val " +
                 "FROM TIMEDMETRIC " +
                 "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "'";
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myLatest, sql)) {
             for (List<?> row : cursor)
-                return new Tuple2<>((Double) row.get(0), 1L);
+                res = new Tuple2<>((Double) row.get(0), 1L);
         }
         //If main memory cache is empty (due to restart){
         sql = "SELECT a.val " +
@@ -287,9 +290,9 @@ public class DataManagement implements DataManagementInterface {
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
             for (List<?> row : cursor)
-                return new Tuple2<>((Double) row.get(0), 1L);
+                res = new Tuple2<>((Double) row.get(0), 1L);
         }
-        return null;
+        return res;
     }
 
     private Tuple2<Double, Long> extractMonitoringQuery(HostMetricKey key, long from, int agg) {
