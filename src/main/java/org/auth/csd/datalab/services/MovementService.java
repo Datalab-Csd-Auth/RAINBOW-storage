@@ -19,7 +19,6 @@ import org.auth.csd.datalab.common.Helpers.Tuple2;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 
 import javax.cache.Cache;
-import javax.persistence.criteria.CriteriaBuilder;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,7 +30,7 @@ public class MovementService implements MovementInterface {
 
     @IgniteInstanceResource
     private Ignite ignite;
-    private final static String SQL_WHERE = " WHERE ";
+    private static final String SQL_WHERE = " WHERE ";
     /**
      * Reference to the cache.
      */
@@ -279,7 +278,7 @@ public class MovementService implements MovementInterface {
     public HashMap<HostMetricKey, MetaMetric> extractMonitoringList(HashMap<String, HashSet<String>> filter, HashSet<String> nodesList) {
         HashMap<HostMetricKey, MetaMetric> result;
         if (nodesList.isEmpty()) {
-            String[] hostnames = ignite.cluster().forServers().hostNames().toArray(new String[0]);//TODO IPv6 bug
+            String[] hostnames = ignite.cluster().forServers().hostNames().toArray(new String[0]);
             result = extractMetaData(filter, hostnames);
         }else{
             result = extractMetaData(filter, nodesList.toArray(new String[0]));
