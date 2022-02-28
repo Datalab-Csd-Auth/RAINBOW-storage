@@ -5,10 +5,11 @@ services:
     image: registry.gitlab.com/rainbow-project1/rainbow-storage:latest
     network_mode: host
     environment:
-      NODE: SERVER
       DISCOVERY: "ipv6"
       HOSTNAME: "ipv6"
+      CLUSTER_HEAD: "true" #There should be only 1 cluster head that takes care of data placement. Default value is false.
+      PLACEMENT: "false" #Enable/disable data placement algorithms
       JAVA_OPTS: "-Xms256m -Xmx256m" #Java heap size
       SIZE: "512" #Size for total off-heap storage (1/2 for persistence and 1/2 for in-memory caches)
     volumes:
-      - ./data:/opt/assets/ignite
+      - ./rainbow-storage-data:/opt/assets/ignite
