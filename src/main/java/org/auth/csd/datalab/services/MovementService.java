@@ -19,7 +19,6 @@ import org.auth.csd.datalab.common.Helpers.Tuple2;
 import org.auth.csd.datalab.common.models.values.TimedMetric;
 
 import javax.cache.Cache;
-import javax.persistence.criteria.CriteriaBuilder;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,7 +30,7 @@ public class MovementService implements MovementInterface {
 
     @IgniteInstanceResource
     private Ignite ignite;
-    private final static String SQL_WHERE = " WHERE ";
+    private static final String SQL_WHERE = " WHERE ";
     /**
      * Reference to the cache.
      */
@@ -313,7 +312,7 @@ public class MovementService implements MovementInterface {
     public HashMap<String, Boolean> extractNodes() {
         HashMap<String, Boolean> result = new HashMap<>();
         for (ClusterNode node : ignite.cluster().forServers().nodes()){
-            result.put(node.hostNames().toString(), node.attribute("data.head"));
+            result.put(node.hostNames().iterator().next(), node.attribute("data.head"));
         }
         return result;
     }
@@ -338,7 +337,7 @@ public class MovementService implements MovementInterface {
         //So we go with a full scan query
         try (QueryCursor<Cache.Entry<HostMetricKey, List<String>>> qryCursor = myReplica.query(new ScanQuery<>())) {
             for (Cache.Entry<HostMetricKey, List<String>> entry: qryCursor.getAll()){
-                if(entry.getKey().hostname.equals(localNode)){
+                if(entry.getKey().hostname.equals(ignite.cluster().forLocal().hostNames().iterator().next())){
                     replicate = true;
                     break;
                 }

@@ -61,11 +61,11 @@ public class ServerNodeStartup {
     }
 
     public static void createServer(String discovery, String hostname) throws IgniteException {
-        localNode = hostname;
         Ignite ignite = Ignition.getOrStart(igniteConfiguration(discovery, hostname));
         ignite.cluster().state(ClusterState.ACTIVE);
         ignite.cluster().baselineAutoAdjustEnabled(true);
         ignite.cluster().baselineAutoAdjustTimeout(10000);
+        localNode = ignite.cluster().forLocal().hostNames().iterator().next();
     }
 
     private static IgniteConfiguration igniteConfiguration(String discovery, String hostname) {
@@ -89,7 +89,6 @@ public class ServerNodeStartup {
                 .setIpFinder(new TcpDiscoveryVmIpFinder().setAddresses(Arrays.asList(discovery.split(NodeStartup.DISCOVERY_DELIMITER))))
         );
         cfg.setConsistentId(hostname);
-//        cfg.setIgniteInstanceName(hostname);
         //Enable events
         cfg.setIncludeEventTypes(EventType.EVT_NODE_JOINED, EventType.EVT_NODE_LEFT,
                 EventType.EVT_NODE_FAILED);
