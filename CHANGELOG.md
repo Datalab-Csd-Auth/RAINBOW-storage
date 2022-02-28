@@ -1,10 +1,11 @@
 # Changelog
 
-## [1.4.2] - 28-02-2022
+## [1.4.3] - 28-02-2022
 
 ### Changed
 
 - Fixes based on sonarqube
+- Fix on instance name
 
 ## [1.4.0] - 21-02-2022
 
@@ -159,6 +160,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.3
 [1.4.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.2
 [1.4.1]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.1
 [1.4.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.0
