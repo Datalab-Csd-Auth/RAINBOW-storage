@@ -279,7 +279,7 @@ public class MovementService implements MovementInterface {
     public HashMap<HostMetricKey, MetaMetric> extractMonitoringList(HashMap<String, HashSet<String>> filter, HashSet<String> nodesList) {
         HashMap<HostMetricKey, MetaMetric> result;
         if (nodesList.isEmpty()) {
-            String[] hostnames = ignite.cluster().forServers().hostNames().toArray(new String[0]);
+            String[] hostnames = ignite.cluster().forServers().hostNames().toArray(new String[0]);//TODO IPv6 bug
             result = extractMetaData(filter, hostnames);
         }else{
             result = extractMetaData(filter, nodesList.toArray(new String[0]));
@@ -313,7 +313,7 @@ public class MovementService implements MovementInterface {
     public HashMap<String, Boolean> extractNodes() {
         HashMap<String, Boolean> result = new HashMap<>();
         for (ClusterNode node : ignite.cluster().forServers().nodes()){
-            result.put(node.hostNames().toString(), node.attribute("data.head"));
+            result.put(node.hostNames().iterator().next(), node.attribute("data.head"));
         }
         return result;
     }
@@ -338,7 +338,7 @@ public class MovementService implements MovementInterface {
         //So we go with a full scan query
         try (QueryCursor<Cache.Entry<HostMetricKey, List<String>>> qryCursor = myReplica.query(new ScanQuery<>())) {
             for (Cache.Entry<HostMetricKey, List<String>> entry: qryCursor.getAll()){
-                if(entry.getKey().hostname.equals(localNode)){
+                if(entry.getKey().hostname.equals(ignite.cluster().forLocal().hostNames().iterator().next())){
                     replicate = true;
                     break;
                 }
