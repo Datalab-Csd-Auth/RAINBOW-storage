@@ -1,4 +1,4 @@
-package org.auth.csd.datalab.common.models;
+package org.auth.csd.datalab.common.models.values;
 
 import org.apache.ignite.cache.query.annotations.QuerySqlField;
 
@@ -13,8 +13,6 @@ public class Metric {
 
     @Override
     public String toString() {
-        return "{" +
-                " \"value\": \"" + val + "\"" +
-                '}';
+        return "\"val\": " + val;
     }
 }

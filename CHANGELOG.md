@@ -1,10 +1,35 @@
 # Changelog
 
+## [1.4.0] - 21-02-2022
+
+### Added
+
+- New endpoints for deleting data (monitoring, analytics, app).
+- New endpoint for getting the list of monitoring metadata.
+- New endpoint for getting list of active nodes
+- Aggregation queries (and endpoint) on monitoring data.
+- New service in charge of data movement for monitoring data. I.e. getting data from remote nodes and replicating local data to remote ones. 
+- New service in charge of data placement based on node restarts/fails (can be optionally turned off using an environment variable).
+- Two new replicated caches that help store metadata for the placement and movement services.
+- New environment variable `CLUSTER_HEAD` which creates the main server node that initialize the caches and runs the placement service.
+
+### Changed
+
+- Monitoring metadata cache is now replicated to all nodes.
+- Changed analytics cache to be able to store historical data.
+- Split http service from the data management and movement services.
+- Updated unit tests
+- Refactoring of the codebase with SonarLint recommendations.
+
+### Removed
+
+- Client option is removed since the cluster head option does the same job and stores analytics data.
+
 ## [1.3.5] - 23-11-2021
 
 ### Added
 
-- Wildcards on filters for get queries
+- Wildcards on filters for get queries.
 
 ## [1.3.4] - 09-11-2021
 
@@ -128,6 +153,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.0]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.0
 [1.3.5]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.5
 [1.3.4]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.4
 [1.3.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.3.3
