@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.5] - 18-03-2022
+
+### Changed
+
+- Cost function on unstable nodes
+- Unstable nodes can a max capacity on outgoing replicas
+
 ## [1.4.4] - 28-02-2022
 
 ### Changed
@@ -161,6 +168,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.5]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.5
 [1.4.4]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.4
 [1.4.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.3
 [1.4.2]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.2
