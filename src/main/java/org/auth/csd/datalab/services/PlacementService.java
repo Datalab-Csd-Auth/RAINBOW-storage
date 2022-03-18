@@ -35,11 +35,12 @@ public class PlacementService implements PlacementInterface {
     private static IgniteCache<HostMetricKey, Set<String>> myReplica;
     private static IgniteCache<String, Restarts> myRestarts;
     private static final int STABLE_MAX_FAILS = 1;
+    private static final int MAX_OUT_REPLICAS = 2;
     private static final long OLD_PERIOD = (1000 * 60 * 60 * 24 * 7); //1 week
     private static final long MID_PERIOD = (1000 * 60 * 60 * 24 * 2); //2 days
     private static long interval = 1800; //Seconds (30 mins default)
     private static final long PROBLEMATIC_TAG_INTERVAL = 3600; //(Seconds) Tag the node as a possible problem if it hasn't been replicated in the last XXX time period
-    private static final double PROBLEMATIC_THRESHOLD = 50; //Threshold to identify the node as problematic (Possibly needs to be refined)
+    private static final double PROBLEMATIC_THRESHOLD = 0.01; //Threshold to identify the node as problematic (Possibly needs to be refined)
     private static volatile boolean cancelled=false; //Loop cancel
 
     private void startListener() {
@@ -111,6 +112,8 @@ public class PlacementService implements PlacementInterface {
             String hostname = node.hostNames().iterator().next();
             Restarts nodeFails = (myRestarts.containsKey(hostname)) ? myRestarts.get(hostname) : null;
             if (nodeFails == null || nodeFails.failTimes.size() < 1 || nodeFails.lastReplication >= currTime - PROBLEMATIC_TAG_INTERVAL) continue; //It is not a problematic node
+            //Check if it reached max capacity
+            if(getReplicatedMetricsMax(hostname) >= MAX_OUT_REPLICAS) continue;
             //Else get a weighted average of the time between fails
             //Start by getting the start time of the node
             long startTime = nodeFails.startTime;
@@ -124,8 +127,8 @@ public class PlacementService implements PlacementInterface {
                 if (timestamp <= currTime - OLD_PERIOD) a = 0.5 * oldFails;
                 else if (timestamp <= currTime - MID_PERIOD) a = midFails;
                 else a = 2D * newFails;
-                if (i == 0) sum += a * (timestamp - startTime);
-                else sum += a * (timestamp - nodeFails.failTimes.get(i - 1));
+                if (i == 0) sum += a / (timestamp - startTime);
+                else sum += a / (timestamp - nodeFails.failTimes.get(i - 1));
             }
             //Add the node with the score in the map if it passes above a threshold
             if (sum >= PROBLEMATIC_THRESHOLD) problematicNodes.add(new NodeScore(hostname, sum));
@@ -204,6 +207,24 @@ public class PlacementService implements PlacementInterface {
         } else return null;
     }
 
+    private int getReplicatedMetricsMax(String hostname){
+        int maxtm = 0;
+        MovementInterface srvInterface = ignite.services(ignite.cluster().forLocal()).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+        HashSet<String> sourceSet = new HashSet<>();
+        sourceSet.add(hostname);
+        HashMap<HostMetricKey, MetaMetric> tmpMmetrics = srvInterface.extractMonitoringList(new HashMap<>(), sourceSet);
+        if (!tmpMmetrics.isEmpty()) {
+            Set<HostMetricKey> metrics = tmpMmetrics.keySet();
+            //Get already replicated data points
+            Map<HostMetricKey, Set<String>> replicas = myReplica.getAll(metrics);
+            for (Set<String> i: replicas.values()){
+                if(i.size() >= maxtm) maxtm = i.size();
+            }
+            return maxtm;
+        }
+        return maxtm;
+    }
+
     @NotNull
     private List<NodeScore> sortScores(int topN, ArrayList<NodeScore> nodes) {
         Comparator<NodeScore> comparator = Comparator.comparingDouble(k -> k.score);
@@ -215,7 +236,7 @@ public class PlacementService implements PlacementInterface {
     public void init(ServiceContext ctx) {
         System.out.println("Initializing Placement Service on node:" + ignite.cluster().localNode());
         //Placement interval
-        String tmpInterval = readEnvVariable("PLACEMENT");
+        String tmpInterval = readEnvVariable("PLACEMENT_INTERVAL");
         if (tmpInterval != null) interval = Long.parseLong(tmpInterval);
         myReplica = ignite.cache(REPLICA_HOST_CACHE);
         myRestarts = ignite.cache(RESTART_CACHE);
