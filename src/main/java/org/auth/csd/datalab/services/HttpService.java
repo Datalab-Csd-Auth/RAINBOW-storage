@@ -41,6 +41,7 @@ public class HttpService implements HttpInterface {
     private static final String POD_NAME_STRING = "podName";
     private static final String POD_NAMESPACE_STRING = "podNamespace";
     private static final String CONTAINER_STRING = "containerName";
+    private static final String ENTITY_TYPE_STRING = "entityType";
     //Response messages
     private static final String ERROR_MSG = "ERROR";
     private static final String SUCCESS_INGESTION_MSG = "Ingestion successful!";
@@ -422,6 +423,8 @@ public class HttpService implements HttpInterface {
                 filters.put(POD_NAMESPACE_STRING, new HashSet<>(obj.getJSONArray(POD_NAMESPACE_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
             if (obj.has(CONTAINER_STRING))
                 filters.put(CONTAINER_STRING, new HashSet<>(obj.getJSONArray(CONTAINER_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            if (obj.has(ENTITY_TYPE_STRING))
+                filters.put(ENTITY_TYPE_STRING, new HashSet<>(obj.getJSONArray(ENTITY_TYPE_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
             return filters;
         }
 
@@ -431,8 +434,9 @@ public class HttpService implements HttpInterface {
             if (obj.has("nodes")) { //Get data from the cluster
                 JSONArray nodes = obj.getJSONArray("nodes");
                 nodesList = nodes.toList().stream().map(Object::toString).collect(Collectors.toCollection(HashSet::new));
+                return nodesList;
             }
-            return nodesList;
+            return null;
         }
 
         //Get first timestamp from json
