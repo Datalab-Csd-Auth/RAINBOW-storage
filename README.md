@@ -130,6 +130,7 @@ The `entityID`, `metricID`, `val` and `timestamp` fields are mandatory.
 {   
     "metricID": ["metr1"], (optional)
     "entityID": ["ent1"], (optional)
+    "entityType": ["fog"], (optional)
     "podName": ["pod1"], (optional)
     "podNamespace": ["name1"], (optional)
     "containerName": ["container1"], (optional)
