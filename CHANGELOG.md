@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.6] - 23-03-2022
+
+### Added
+
+- New filter on monitoring requests
+- Option to get monitoring data from every node with an empty `node` field
+
 ## [1.4.5] - 18-03-2022
 
 ### Changed
@@ -168,6 +175,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.6]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.6
 [1.4.5]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.5
 [1.4.4]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.4
 [1.4.3]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.3
