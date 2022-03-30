@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.auth.csd.datalab</groupId>
     <artifactId>rainbow-storage</artifactId>
-    <version>1.4.6</version>
+    <version>1.4.7</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
