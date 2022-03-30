@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.7] - 30-03-2022
+
+- Hotfix on json schema
+
 ## [1.4.6] - 23-03-2022
 
 ### Added
@@ -175,6 +179,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.7]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.7
 [1.4.6]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.6
 [1.4.5]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.5
 [1.4.4]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.4
