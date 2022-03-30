@@ -150,7 +150,10 @@ public class HttpService implements HttpInterface {
                                     result.deleteCharAt(result.length() - 1);
                                 }
                                 result.append("]}");
+                                result.append(",");
                             }
+                            if(!data.entrySet().isEmpty())
+                                result.deleteCharAt(result.length() - 1);
                         } catch (Exception e) {
                             e.printStackTrace();
                             return serializeToJson(HttpUtils.noReq(), ctx, req.isKeepAlive.value, new Message(ERROR_MSG, ERROR_EXTRACTION_MSG));
