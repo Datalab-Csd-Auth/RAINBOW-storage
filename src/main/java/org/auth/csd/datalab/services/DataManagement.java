@@ -32,6 +32,7 @@ public class DataManagement implements DataManagementInterface {
     private static IgniteCache<HostMetricTimeKey, Metric> myHistorical;
     private static IgniteCache<AnalyticKey, Metric> myAnalytics;
     private static IgniteCache<AnalyticKey, Metric> myApp = null;
+    private static final String orderBy = " ORDER BY timestamp ";
 
     //------------APP----------------
     private List<String> extractAppKeys() {
@@ -48,10 +49,13 @@ public class DataManagement implements DataManagementInterface {
 
     private List<TimedMetric> extractAppData(String key) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT a.* " +
-                "FROM METRIC AS a " +
-                "INNER JOIN (SELECT key, MAX(timestamp) as timestamp FROM METRIC GROUP BY key) AS b ON a.key = b.key AND a.timestamp = b.timestamp " +
-                "WHERE a.key = '" + key + "'";
+//        String sql = "SELECT a.* " +
+//                "FROM METRIC AS a " +
+//                "INNER JOIN (SELECT key, MAX(timestamp) as timestamp FROM METRIC GROUP BY key) AS b ON a.key = b.key AND a.timestamp = b.timestamp " +
+//                "WHERE a.key = '" + key + "'";
+        String sql = "SELECT key, timestamp, val " +
+                "FROM METRIC " +
+                "WHERE key = '" + key + "'" + orderBy + " DESC LIMIT 1" ;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myApp, sql)) {
             for (List<?> row : cursor) {
@@ -63,7 +67,7 @@ public class DataManagement implements DataManagementInterface {
 
     private List<TimedMetric> extractAppData(String key, long from) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp >= " + from + " AND key = '" + key + "'";
+        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp >= " + from + " AND key = '" + key + "'" + orderBy;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myApp, sql)) {
             for (List<?> row : cursor)
@@ -74,7 +78,7 @@ public class DataManagement implements DataManagementInterface {
 
     private List<TimedMetric> extractAppData(String key, long from, long to) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp BETWEEN " + from + " AND " + to + " AND key = '" + key + "'";
+        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp BETWEEN " + from + " AND " + to + " AND key = '" + key + "'" + orderBy;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myApp, sql)) {
             for (List<?> row : cursor)
@@ -141,10 +145,13 @@ public class DataManagement implements DataManagementInterface {
 
     private List<TimedMetric> extractAnalyticsData(String key) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT a.* " +
-                "FROM METRIC AS a " +
-                "INNER JOIN (SELECT key, MAX(timestamp) as timestamp FROM METRIC GROUP BY key) AS b ON a.key = b.key AND a.timestamp = b.timestamp " +
-                "WHERE a.key = '" + key + "'";
+//        String sql = "SELECT a.* " +
+//                "FROM METRIC AS a " +
+//                "INNER JOIN (SELECT key, MAX(timestamp) as timestamp FROM METRIC GROUP BY key) AS b ON a.key = b.key AND a.timestamp = b.timestamp " +
+//                "WHERE a.key = '" + key + "'";
+        String sql = "SELECT key, timestamp, val " +
+                "FROM METRIC " +
+                "WHERE key = '" + key + "'" + orderBy + " DESC LIMIT 1" ;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
             for (List<?> row : cursor) {
@@ -156,7 +163,7 @@ public class DataManagement implements DataManagementInterface {
 
     private List<TimedMetric> extractAnalyticsData(String key, long from) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp >= " + from + " AND key = '" + key + "'";
+        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp >= " + from + " AND key = '" + key + "'" + orderBy;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
             for (List<?> row : cursor)
@@ -167,7 +174,7 @@ public class DataManagement implements DataManagementInterface {
 
     private List<TimedMetric> extractAnalyticsData(String key, long from, long to) {
         List<TimedMetric> result = new ArrayList<>();
-        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp BETWEEN " + from + " AND " + to + " AND key = '" + key + "'";
+        String sql = "SELECT key, timestamp, val FROM METRIC WHERE timestamp BETWEEN " + from + " AND " + to + " AND key = '" + key + "'" + orderBy;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myAnalytics, sql)) {
             for (List<?> row : cursor)
@@ -249,7 +256,8 @@ public class DataManagement implements DataManagementInterface {
         List<TimedMetric> result = new ArrayList<>();
         String sql = "SELECT timestamp, val " +
                 "FROM METRIC " +
-                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp >= " + from;
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp >= " + from
+                + orderBy;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
             for (List<?> row : cursor)
@@ -262,7 +270,8 @@ public class DataManagement implements DataManagementInterface {
         List<TimedMetric> result = new ArrayList<>();
         String sql = "SELECT timestamp, val " +
                 "FROM METRIC " +
-                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp BETWEEN " + from + " AND " + to;
+                "WHERE metricID = '" + key.metric.metricID + "' AND entityID = '" + key.metric.entityID + "' AND hostname = '" + key.hostname + "' AND timestamp BETWEEN " + from + " AND " + to
+                + orderBy;
         // Iterate over the result set.
         try (QueryCursor<List<?>> cursor = getQueryValues(myHistorical, sql)) {
             for (List<?> row : cursor)
