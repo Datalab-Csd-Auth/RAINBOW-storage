@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.8] - 01-03-2022
+
+- Added order by timestamp on data extraction
+- Fixed response time for analytics
+
 ## [1.4.7] - 30-03-2022
 
 - Hotfix on json schema
@@ -179,6 +184,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.8]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.8
 [1.4.7]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.7
 [1.4.6]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.6
 [1.4.5]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.5
