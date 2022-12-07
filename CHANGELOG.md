@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.9] - 07-12-2022
+
+- Fixed timestamp precision on data placement algorithm
+- New unstable nodes will be removed as replication destinations from previous iterations of the placement algorithm
+- New stable nodes will be removed as replication sources from previous iterations of the placement algorithm
+
 ## [1.4.8] - 01-03-2022
 
 - Added order by timestamp on data extraction
@@ -184,6 +190,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.9]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.9
 [1.4.8]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.8
 [1.4.7]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.7
 [1.4.6]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.6

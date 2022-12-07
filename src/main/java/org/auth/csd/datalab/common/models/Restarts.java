@@ -8,12 +8,18 @@ public class Restarts {
     public List<Long> failTimes;
     public long startTime;
     public long lastReplication;
+    public List<String> replicaTo;
+    public List<String> replicaFrom;
+
 
     public Restarts(long startTime) {
         this.startTime = startTime;
         restartTimes = new ArrayList<>();
         failTimes = new ArrayList<>();
         lastReplication = 0L;
+        replicaTo = new ArrayList<>();
+        replicaFrom = new ArrayList<>();
+
     }
 
 
@@ -28,4 +34,25 @@ public class Restarts {
     public void addReplication(long timestamp){
         lastReplication = timestamp;
     }
+
+    public void addDestination(String dest){
+        replicaTo.add(dest);
+    }
+
+    public void removeDestination(String dest){
+        replicaTo.remove(dest);
+    }
+
+    public void clearDestination(){replicaTo.clear();}
+
+    public void addSource(String source){
+        replicaFrom.add(source);
+    }
+
+    public void removeSource(String source){
+        replicaFrom.remove(source);
+    }
+
+    public void clearSource(){replicaFrom.clear();}
+
 }
