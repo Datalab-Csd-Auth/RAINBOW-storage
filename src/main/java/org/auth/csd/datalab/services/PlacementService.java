@@ -15,9 +15,11 @@ import org.auth.csd.datalab.common.models.NodeScore;
 import org.auth.csd.datalab.common.models.Restarts;
 import org.auth.csd.datalab.common.models.keys.HostMetricKey;
 import org.auth.csd.datalab.common.models.values.MetaMetric;
+import org.auth.csd.datalab.InfluxConnector.WriteData;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -53,21 +55,82 @@ public class PlacementService implements PlacementInterface {
             String hostname = evt.eventNode().hostNames().iterator().next();
             long currTime = System.currentTimeMillis();
             boolean newHost = !myRestarts.containsKey(hostname);
-            if(newHost) myRestarts.put(hostname, new Restarts(currTime));
+            if(newHost) {
+                System.out.println(hostname + " has started");
+                myRestarts.put(hostname, new Restarts(currTime));
+                WriteData.writeNodeStart(hostname, currTime);
+            }
             else {
                 Restarts tmp = myRestarts.get(hostname);
                 if (type == EventType.EVT_NODE_JOINED) {
+                    System.out.println(hostname + " has restarted");
                     tmp.addRestart(currTime);
                     myRestarts.put(hostname, tmp);
+                    WriteData.writeNodeRestart(hostname, currTime);
                 } else if (type == EventType.EVT_NODE_FAILED) {
+                    System.out.println(hostname + " has failed");
                     tmp.addFail(currTime);
                     myRestarts.put(hostname, tmp);
+                    WriteData.writeNodeFail(hostname, currTime);
                 }
             }
             return true; // Continue listening.
         };
         // Subscribe to the discovery events that are triggered on the local node.
         events.localListen(localListener, EventType.EVT_NODE_JOINED, EventType.EVT_NODE_FAILED);
+    }
+
+    private void clearPreviousUnstable(String hostname){
+        long currTime = System.currentTimeMillis();
+        //Set replication on the node to false, so it stops replicating data
+        MovementInterface srvInterface = ignite.services(ignite.cluster().forHost(hostname)).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+        srvInterface.setReplication(false);
+        //Remove the entries from the replicas cache
+         HashSet<String> sourceSet = new HashSet<>();
+         sourceSet.add(hostname);
+         HashMap<HostMetricKey, MetaMetric> tmpMmetrics = srvInterface.extractMonitoringList(new HashMap<>(), sourceSet);
+        if(!tmpMmetrics.isEmpty()) myReplica.removeAll(tmpMmetrics.keySet());
+        //Update meta
+        Restarts nodeInfo = myRestarts.get(hostname);
+        //And update the replica set
+        nodeInfo.replicaTo.forEach(k -> {
+            Restarts tmpDest = myRestarts.get(k);
+            tmpDest.removeSource(hostname);
+            myRestarts.put(k, tmpDest);
+            WriteData.writeReplicaStop(hostname, k, currTime);
+        });
+        nodeInfo.clearDestination();
+        myRestarts.put(hostname, nodeInfo);
+    }
+
+    private void clearPreviousStable(String hostname){
+        long currTime = System.currentTimeMillis();
+        Restarts nodeInfo = myRestarts.get(hostname);
+        nodeInfo.replicaFrom.forEach(k -> {
+            Restarts tmpRestart = myRestarts.get(k);
+            MovementInterface srvInterface = ignite.services(ignite.cluster().forHost(k)).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
+            HashSet<String> sourceSet = new HashSet<>();
+            sourceSet.add(k);
+            HashMap<HostMetricKey, MetaMetric> tmpMmetrics = srvInterface.extractMonitoringList(new HashMap<>(), sourceSet);
+            AtomicBoolean continueReplication = new AtomicBoolean(false);
+            if(!tmpMmetrics.isEmpty()) {
+                tmpMmetrics.keySet().forEach(metric -> {
+                    Set<String> tmpDests = myReplica.get(metric);
+                    tmpDests.remove(hostname);
+                    if(tmpDests.isEmpty()) myReplica.remove(metric);
+                    else {
+                        myReplica.put(metric, tmpDests);
+                        continueReplication.set(true);
+                    }
+                });
+            }
+            srvInterface.setReplication(continueReplication.get());
+            tmpRestart.removeDestination(hostname);
+            myRestarts.put(k, tmpRestart);
+            WriteData.writeReplicaStop(k, hostname, currTime);
+        });
+        nodeInfo.clearSource();
+        myRestarts.put(hostname, nodeInfo);
     }
 
     private boolean decidePlacement() {
@@ -84,10 +147,18 @@ public class PlacementService implements PlacementInterface {
                         //Replicate stuff
                         MovementInterface srvInterface = ignite.services(ignite.cluster().forHost(source.node)).serviceProxy(MovementInterface.SERVICE_NAME, MovementInterface.class, false);
                         srvInterface.startReplication(new HashSet<>(dest.getValue()), dest.getKey().node);
-                        //Update the last replication time
+                        //Write data to influx
+                        System.out.println("Replicating : " + source.node + " to " + dest.getKey().node);
+                        WriteData.writeReplicaStart(source.node, dest.getKey().node, currTime);
+                        //Update the last replication time and the destination
                         Restarts tmp = myRestarts.get(source.node); //No need for check. It has been completed on finding the problematic node
                         tmp.addReplication(currTime);
+                        tmp.addDestination(dest.getKey().node);
                         myRestarts.put(source.node, tmp);
+                        //Update the source node
+                        Restarts tmp2 = myRestarts.get(dest.getKey().node); //No need for check. It has been completed on finding the stable node
+                        tmp2.addSource(source.node);
+                        myRestarts.put(dest.getKey().node, tmp2);
                         //Update the replica table
                         String newHost = dest.getKey().node;
                         dest.getValue().forEach(k -> {
@@ -97,9 +168,9 @@ public class PlacementService implements PlacementInterface {
                             repls.add(newHost);
                             myReplica.put(k, repls);
                         });
-                        return true;
                     }
                 }
+                return true;
             }
         }
         return false;
@@ -111,9 +182,23 @@ public class PlacementService implements PlacementInterface {
         for (ClusterNode node : ignite.cluster().forServers().forRemotes().nodes()) {
             String hostname = node.hostNames().iterator().next();
             Restarts nodeFails = (myRestarts.containsKey(hostname)) ? myRestarts.get(hostname) : null;
-            if (nodeFails == null || nodeFails.failTimes.size() < 1 || nodeFails.lastReplication >= currTime - PROBLEMATIC_TAG_INTERVAL) continue; //It is not a problematic node
+            if(nodeFails == null) {
+                System.out.println(hostname + " has started");
+                myRestarts.put(hostname, new Restarts(currTime));
+                WriteData.writeNodeStart(hostname, currTime);
+                continue;
+            }
+            if (nodeFails.failTimes.isEmpty() || nodeFails.lastReplication >= (currTime - (PROBLEMATIC_TAG_INTERVAL*1000))) {
+//                WriteData.writeUnstableScore(hostname, currTime, 0D);
+                continue; //It is not a problematic node
+            }
             //Check if it reached max capacity
-            if(getReplicatedMetricsMax(hostname) >= MAX_OUT_REPLICAS) continue;
+//            if(getReplicatedMetricsMax(hostname) >= MAX_OUT_REPLICAS) {
+            //TODO DEMO PURPOSES ONLY
+            if(nodeFails.replicaTo.size() >= MAX_OUT_REPLICAS){
+//                WriteData.writeUnstableScore(hostname, currTime, 0D);
+                continue;
+            }
             //Else get a weighted average of the time between fails
             //Start by getting the start time of the node
             long startTime = nodeFails.startTime;
@@ -127,11 +212,17 @@ public class PlacementService implements PlacementInterface {
                 if (timestamp <= currTime - OLD_PERIOD) a = 0.5 * oldFails;
                 else if (timestamp <= currTime - MID_PERIOD) a = midFails;
                 else a = 2D * newFails;
-                if (i == 0) sum += a / (timestamp - startTime);
-                else sum += a / (timestamp - nodeFails.failTimes.get(i - 1));
+                if (i == 0) sum += a / ((timestamp - startTime)/1000D);
+                else sum += a / ((timestamp - nodeFails.failTimes.get(i - 1))/1000D);
             }
+            System.out.println("Host: " + hostname + " - sum: " + sum);
+            WriteData.writeUnstableScore(hostname, currTime, sum);
             //Add the node with the score in the map if it passes above a threshold
-            if (sum >= PROBLEMATIC_THRESHOLD) problematicNodes.add(new NodeScore(hostname, sum));
+            if (sum >= PROBLEMATIC_THRESHOLD) {
+                problematicNodes.add(new NodeScore(hostname, sum));
+                //check if a problematic node is a replica destination for another node
+                if(!nodeFails.replicaFrom.isEmpty()) clearPreviousStable(hostname);
+            }
         }
         //Find and return the top N nodes
         if (problematicNodes.isEmpty()) return problematicNodes;
@@ -144,15 +235,21 @@ public class PlacementService implements PlacementInterface {
         for (ClusterNode node : ignite.cluster().forServers().forRemotes().nodes()) {
             String hostname = node.hostNames().iterator().next();
             Restarts nodeInfo = (myRestarts.containsKey(hostname)) ? myRestarts.get(hostname) : null;
-            if(!exclude.contains(hostname) && nodeInfo != null){
+            if(nodeInfo == null) continue;
+            if(!exclude.contains(hostname)){
                 //Get number of fails
                 long nodeFails = nodeInfo.failTimes.stream().filter(k -> k > currTime - MID_PERIOD).count();
-                if (nodeFails > STABLE_MAX_FAILS || nodeInfo.lastReplication > currTime - PROBLEMATIC_TAG_INTERVAL) //Either it has failed too many times or it has been replicated in the last hour
+                if (nodeFails > STABLE_MAX_FAILS || nodeInfo.lastReplication > currTime - (PROBLEMATIC_TAG_INTERVAL*1000)) { //Either it has failed too many times or it has been replicated in the last hour
+//                    WriteData.writeStableScore(hostname, currTime, 0D);
                     continue; //If it failed many times recently exclude it
+                }
                 //Sum up the restarts and the fails
-                double nodeRestarts = (-nodeInfo.restartTimes.size() - (nodeFails * 3D)) * (currTime - nodeInfo.startTime); //Get the time alive of the node minus the restarts
+                double nodeRestarts = (-nodeInfo.restartTimes.size() - (nodeFails * 3D)) * ((currTime - nodeInfo.startTime)/1000D); //Get the time alive of the node minus the restarts
+                WriteData.writeStableScore(hostname, currTime, nodeRestarts);
                 //Add the node with the score in the map (Bigger score = better node)
                 stableNodes.add(new NodeScore(hostname, nodeRestarts));
+                //If the node was unstable in the past remove the replications
+                if(!nodeInfo.replicaTo.isEmpty()) clearPreviousUnstable(hostname);
             }
         }
         //Find and return the top N nodes
@@ -204,7 +301,20 @@ public class PlacementService implements PlacementInterface {
             }
             if(resultNode == null) return null;
             else return new AbstractMap.SimpleEntry<>(resultNode, metricsToReplicate);
-        } else return null;
+        } else { //TODO FOR DEMO PURPOSE ONLY
+            Restarts nodeFails = myRestarts.get(source.node);
+            Iterator<NodeScore> iter = dest.iterator();
+            boolean check = false;
+            while (iter.hasNext() && !check){
+                NodeScore tmp = iter.next();
+                if(!nodeFails.replicaTo.contains(tmp.node)){
+                    resultNode = tmp;
+                    check = true;
+                }
+            }
+            return new AbstractMap.SimpleEntry<>(resultNode, metricsToReplicate);
+            //return null;
+        }
     }
 
     private int getReplicatedMetricsMax(String hostname){
@@ -246,9 +356,14 @@ public class PlacementService implements PlacementInterface {
         System.out.println("Executing Placement Service on node:" + ignite.cluster().localNode());
         //Start the event listener
         startListener();
+        System.out.println("Started listener");
         //Every X time period execute the placement method (maybe streaming outlier detection)?
+        Thread.sleep(60000); //Wait a minute before starting the placement stuff
         do {
+            //Start placement checks
+            System.out.println("Placement decision");
             decidePlacement();
+            System.out.println("Decision taken");
             if(cancelled) break;
             Thread.sleep(interval * 1000);
         } while (true);

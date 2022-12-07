@@ -5,4 +5,6 @@ echo "Building the Ignite server image"
 #docker buildx build -f Dockerfile_debug --push -t registry.gitlab.com/rainbow-project1/rainbow-integration/rainbow-storage:v."$ignite" --platform linux/amd64,linux/arm64 .
 #docker buildx build -f Dockerfile_debug --push -t registry.gitlab.com/rainbow-project1/rainbow-integration/rainbow-storage:latest --platform linux/amd64,linux/arm64 .
 #Testing image
-docker buildx build -f Dockerfile_debug -t rainbow-storage:v."$ignite" --platform amd64 .
+#docker buildx build -f Dockerfile_debug -t rainbow-storage:v."$ignite" --platform amd64 .
+#docker build -f Dockerfile_debug -t rainbow-storage:v."$ignite" .
+docker build -f Dockerfile_debug -t tatoliop/storage:"demo" .

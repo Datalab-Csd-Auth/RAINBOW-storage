@@ -49,7 +49,7 @@ public class MovementService implements MovementInterface {
         }
     }
 
-    //Extract the meta data for the monitoring data
+    //Extract the metadata for the monitoring data
     private HashMap<HostMetricKey, MetaMetric> extractMetaData(HashMap<String, HashSet<String>> filter, String... hostname) {
         String select = "SELECT metricID, entityID, entityType, name, units, desc, groupName, minVal, maxVal, higherIsBetter, podUUID, podName, podNamespace, containerID, containerName, hostname ";
         String from = "FROM METAMETRIC ";
