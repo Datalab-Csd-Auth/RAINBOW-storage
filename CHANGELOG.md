@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.10] - 23-02-2022
+
+- New filter on "group" field of monitoring metrics
+
 ## [1.4.9] - 07-12-2022
 
 - Fixed timestamp precision on data placement algorithm
@@ -190,6 +194,7 @@
 - 3 services for `Ignite-server` (Ingestion, Extraction, Rebalance).
 - 1 service for `Ignite-client` (Extraction).
 
+[1.4.10]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.10
 [1.4.9]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.9
 [1.4.8]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.8
 [1.4.7]: https://gitlab.com/rainbow-project1/rainbow-storage/-/tree/v.1.4.7
