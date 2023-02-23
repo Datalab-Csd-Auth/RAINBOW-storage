@@ -38,6 +38,7 @@ public class HttpService implements HttpInterface {
     private static HashMap<String, Integer> aggregations;
     private static final String METRIC_STRING = "metricID";
     private static final String ENTITY_STRING = "entityID";
+    private static final String GROUP_STRING = "groupName";
     private static final String POD_NAME_STRING = "podName";
     private static final String POD_NAMESPACE_STRING = "podNamespace";
     private static final String CONTAINER_STRING = "containerName";
@@ -420,6 +421,8 @@ public class HttpService implements HttpInterface {
                 filters.put(METRIC_STRING, new HashSet<>(obj.getJSONArray(METRIC_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
             if (obj.has(ENTITY_STRING))
                 filters.put(ENTITY_STRING, new HashSet<>(obj.getJSONArray(ENTITY_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
+            if (obj.has(GROUP_STRING))
+                filters.put(GROUP_STRING, new HashSet<>(obj.getJSONArray(GROUP_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
             if (obj.has(POD_NAME_STRING))
                 filters.put(POD_NAME_STRING, new HashSet<>(obj.getJSONArray(POD_NAME_STRING).toList().stream().map(Object::toString).collect(Collectors.toList())));
             if (obj.has(POD_NAMESPACE_STRING))
